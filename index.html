@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#9de6ff"><title>My Little Puppy</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,sans-serif;color:#25424d;background:linear-gradient(#a8e7ff,#eafaff);min-height:100dvh}header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;font-weight:800;font-size:21px}.coins{background:#fff8d8;border:2px solid #f7c849;border-radius:22px;padding:7px 13px;font-size:17px}.scene{position:relative;margin:5px 12px;border-radius:24px;overflow:hidden;background:linear-gradient(#8bd7ff 0 58%,#91d877 58%);height:min(52vh,440px);min-height:290px;box-shadow:0 6px 25px #4c9fbd35}.sun{position:absolute;right:30px;top:25px;width:66px;height:66px;background:#fff2a0;border-radius:50%;box-shadow:0 0 28px #fff5a9}.cloud{position:absolute;top:50px;left:10%;font-size:56px;opacity:.9}.ground{position:absolute;bottom:0;width:100%;height:16%;background:#71c65c}.dog{position:absolute;width:min(70%,300px);height:250px;left:50%;bottom:30px;transform:translateX(-50%);transform-origin:50% 100%;animation:bob 1.8s ease-in-out infinite;cursor:pointer;touch-action:manipulation}.dog svg{width:100%;height:100%;filter:drop-shadow(0 8px 5px #467a4a55)}.dog.happy{animation:jump .45s ease-in-out 3}.speech{position:absolute;left:50%;top:15px;transform:translateX(-50%);background:white;border-radius:20px;padding:12px 17px;white-space:nowrap;max-width:90%;font-weight:800;box-shadow:0 3px 10px #26718a30;text-align:center;z-index:2}.house{position:absolute;bottom:35px;right:10px;font-size:65px}.bowl{position:absolute;bottom:18px;left:12px;font-size:45px}.status{text-align:center;margin:9px 15px;font-weight:700}.panel{background:white;margin:12px;border-radius:22px;padding:16px;box-shadow:0 6px 20px #4189a022}.panel h2{margin:0 0 12px;font-size:19px}.items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}button{border:0;border-radius:15px;background:#ffe58b;color:#443619;padding:13px 8px;font-size:15px;font-weight:800;cursor:pointer;min-height:57px}button:active{transform:scale(.97)}button:disabled{opacity:.55}#earn{width:100%;background:#6cd3a6;color:#123f31;margin-top:12px}.hint{font-size:13px;opacity:.8;text-align:center;margin:12px}#error{color:#a50000;white-space:pre-wrap;font-size:12px;margin:10px} @keyframes bob{50%{transform:translateX(-50%) translateY(-6px)}}@keyframes jump{50%{transform:translateX(-50%) translateY(-36px) rotate(4deg)}}@media(max-width:370px){.scene{min-height:275px}.dog{width:78%}.speech{font-size:13px}}
+</style></head><body>
+<header><span>🐾 My Little Puppy</span><span class="coins">🪙 <span id="coins">100</span></span></header>
+<main><section class="scene"><div class="sun"></div><div class="cloud">☁️</div><div class="speech" id="speech">Woof! Feed me!</div><div class="ground"></div><div class="house" id="house" hidden>🏠</div><div class="bowl">🥣</div>
+<div class="dog" id="dog" role="button" aria-label="Pet the puppy" tabindex="0"><svg viewBox="0 0 300 270" xmlns="http://www.w3.org/2000/svg" aria-label="Cute animated puppy">
+<ellipse cx="150" cy="249" rx="85" ry="12" fill="#367e43" opacity=".25"/>
+<path d="M85 180 Q65 120 90 112 Q120 90 150 115 Q190 93 213 123 Q237 160 210 212 Q180 243 110 229Z" fill="#c98647" stroke="#80532f" stroke-width="5"/>
+<path d="M205 159 Q257 108 258 159" fill="none" stroke="#b97b3e" stroke-width="21" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" values="-12 210 165;15 210 165;-12 210 165" dur=".6s" repeatCount="indefinite"/></path>
+<ellipse cx="113" cy="223" rx="25" ry="20" fill="#e8b777" stroke="#80532f" stroke-width="4"/><ellipse cx="190" cy="223" rx="25" ry="20" fill="#e8b777" stroke="#80532f" stroke-width="4"/>
+<ellipse cx="150" cy="107" rx="87" ry="82" fill="#e4ad68" stroke="#80532f" stroke-width="5"/>
+<path d="M84 64 Q29 36 43 134 Q53 165 82 116Z" fill="#9b6035" stroke="#80532f" stroke-width="5"/><path d="M216 64 Q271 36 257 134 Q247 165 218 116Z" fill="#9b6035" stroke="#80532f" stroke-width="5"/>
+<ellipse cx="117" cy="100" rx="12" ry="16" fill="#352923"/><ellipse cx="183" cy="100" rx="12" ry="16" fill="#352923"/><circle cx="121" cy="95" r="4" fill="white"/><circle cx="187" cy="95" r="4" fill="white"/>
+<ellipse cx="150" cy="145" rx="45" ry="33" fill="#ffe0ae"/><ellipse cx="150" cy="128" rx="18" ry="13" fill="#44302a"/><path d="M150 140 Q135 165 118 147 M150 140 Q165 165 182 147" stroke="#603b2b" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M142 159 Q150 192 160 159" fill="#f17b89" stroke="#b94e61" stroke-width="3"/>
+<path d="M112 175 Q150 193 188 175" fill="none" stroke="#ef4e65" stroke-width="13"/><circle cx="150" cy="184" r="11" fill="#ffd96d" stroke="#c39428" stroke-width="3"/>
+</svg></div></section>
+<div class="status" id="quest">Quest 1: Buy food for your puppy!</div>
+<section class="panel"><h2>🛍️ Pet Shop</h2><div class="items"><button id="food">🥫 Food · 30 🪙</button><button id="home">🏠 Dog House · 150 🪙</button><button id="ball">🎾 Ball · 80 🪙</button><button id="bath">🫧 Bath · 60 🪙</button></div><button id="earn">💰 Earn 25 coins</button></section><div class="hint">Tap the puppy to pet it! Progress saves on this device.</div><div id="error"></div></main>
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var state={coins:100,stage:0};
+try{var saved=JSON.parse(localStorage.getItem("puppy-save-v3")||"null");if(saved&&typeof saved.coins==="number"&&typeof saved.stage==="number")state=saved}catch(e){}
+var quests=["Quest 1: Buy food for your puppy!","Quest 2: Buy your puppy a house!","Quest 3: Buy a ball to play!","Quest 4: Give your puppy a bath!","All quests complete! Keep playing!"];
+var sayings=["Woof! Feed me!","I need a little house!","Can we play ball?","Time for a bath!","I love you! 🐾"];
+function update(){ $("coins").textContent=state.coins;$("quest").textContent=quests[Math.min(state.stage,4)];$("speech").textContent=sayings[Math.min(state.stage,4)];$("house").hidden=state.stage<2;try{localStorage.setItem("puppy-save-v3",JSON.stringify(state))}catch(e){}}
+function talk(message){$("speech").textContent=message;setTimeout(function(){$("speech").textContent=sayings[Math.min(state.stage,4)]},2100)}
+function happy(){var d=$("dog");d.classList.remove("happy");void d.offsetWidth;d.classList.add("happy");setTimeout(function(){d.classList.remove("happy")},1500)}
+function buy(price,stage,success){if(state.coins<price){talk("Need more coins! 🪙");return}state.coins-=price;if(state.stage===stage)state.stage=Math.min(4,stage+1);update();happy();talk(success)}
+$("food").onclick=function(){buy(30,0,"Yummy! Thank you! 🥰")};
+$("home").onclick=function(){buy(150,1,"My new home! 🏠")};
+$("ball").onclick=function(){buy(80,2,"Let's play! 🎾")};
+$("bath").onclick=function(){buy(60,3,"So clean! 🫧")};
+$("earn").onclick=function(){state.coins+=25;update();talk("+25 coins! Great job!")};
+$("dog").onclick=function(){happy();talk("Woof woof! ❤️")};
+$("dog").onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();$("dog").click()}};
+window.onerror=function(message){$("error").textContent="Game error: "+message};
+update();
+})();
+</script></body></html>
