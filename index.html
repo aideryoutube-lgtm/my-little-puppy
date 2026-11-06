@@ -32,7 +32,7 @@ function renderGrowth(){var i=growthIndex(),g=growthStages[i],next=growthStages[
 function awardXP(action,amount){var now=Date.now(),last=s.xpCooldowns[action];if(Number.isFinite(last)&&now-last<30000){$('growthHint').textContent='More '+action+' XP in '+Math.ceil((30000-(now-last))/1000)+'s.';return false}s.xpCooldowns[action]=now;s.xp+=amount;update();$('growthHint').textContent='+'+amount+' XP · '+action+'!';return true}
 for(var gi=1;gi<=4;gi++){var preload=new Image();preload.src='./assets/growth/Jerry_Growth_'+gi+'.png'}
 const growthVideos = {
- Baby: {feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4'},
+ Baby: {sleep:'assets/videos/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4'},
  Puppy: {}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
 };
 var activeMedia=null;
