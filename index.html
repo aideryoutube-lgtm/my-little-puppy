@@ -48,7 +48,7 @@ const growthVideos = {
 var activeMedia=null,idleTimer=null;
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
 function idleAllowed(){return growthIndex()===0&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
-function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},5000)}
+function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},3000)}
 function noteActivity(){cancelIdle();if(activeMedia&&activeMedia.action==='idle')stopSleepVideo();scheduleIdle()}
 ['pointerdown','keydown'].forEach(function(type){document.addEventListener(type,noteActivity,true)});
 document.addEventListener('click',noteActivity);
