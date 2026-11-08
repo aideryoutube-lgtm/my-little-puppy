@@ -43,7 +43,7 @@ function awardXP(action,amount){var now=Date.now(),last=s.xpCooldowns[action];if
 for(var gi=1;gi<=4;gi++){var preload=new Image();preload.src='./assets/growth/Jerry_Growth_'+gi+'.png'+(gi===1?'?v=baby-play-still-20261106':'?v=portrait-growth-v1')}
 const growthVideos = {
  Baby: {idle:'assets/videos/baby/Jerry_Baby_Idle.mp4',touch:'assets/videos/baby/Jerry_Baby_Touch_Happy.mp4',sleep:'assets/videos/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4',dress:'assets/videos/baby/Jerry_Baby_Play_02.mp4',care:'assets/videos/baby/Jerry_Baby_Bath.mp4'},
- Puppy: {feed:'assets/videos/puppy/Jerry_Puppy_Feed.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
+ Puppy: {feed:'assets/videos/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/puppy/Jerry_Puppy_House_02.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
 };
 var activeMedia=null,idleTimer=null;
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
