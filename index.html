@@ -102,11 +102,15 @@ function startGrowthVideo(action){
   });
  }
  v.onended=finish;
+ // Some WebKit versions expose frame callbacks without delivering one while the layer is transparent.
+ // Keep advancing-playback detection active even when that API exists.
+ v.ontimeupdate=fallbackFrame;
  v.onplaying=function(){
   if(session!==sleepSession)return;
-  if(v.requestVideoFrameCallback){
-   if(videoFrameRequest===null)videoFrameRequest=v.requestVideoFrameCallback(function(){videoFrameRequest=null;reveal()});
-  }else{v.ontimeupdate=fallbackFrame;fallbackFrame()}
+  if(v.requestVideoFrameCallback&&videoFrameRequest===null){
+   videoFrameRequest=v.requestVideoFrameCallback(function(){videoFrameRequest=null;reveal()});
+  }
+  fallbackFrame();
  };
  v.onerror=function(){if(session===sleepSession){stopSleepVideo();renderGrowth();talk('Video unavailable. Please try again.')}};
  // A matching poster also protects the still while iOS prepares its video layer.
