@@ -26,6 +26,8 @@
 .scene .portrait,.scene .sleep-video{inset:0!important;width:100%!important;height:100%!important;transform:none!important;scale:1!important;animation:none!important;transition:none!important}
 .scene .portrait{background-size:contain!important;background-position:center center!important;background-repeat:no-repeat!important}
 .scene .sleep-video{object-fit:contain!important;object-position:center center!important;background:transparent!important;z-index:4}
+/* Dress shares the still’s floor alignment without changing other clips. */
+.scene[data-growth-stage="Baby"] .sleep-video[data-action="dress"]{object-position:center bottom!important}
 /* Fill the scene for Baby Dress, Bath, and Touch clips. */
 .scene .sleep-video.fill-scene{object-fit:cover!important}
 .scene.video-ready .portrait{visibility:hidden!important;opacity:0!important;pointer-events:none}
@@ -60,7 +62,7 @@ function renderGrowth(){var i=growthIndex(),g=growthStages[i],next=growthStages[
 function awardXP(action,amount){var now=Date.now(),last=s.xpCooldowns[action];if(Number.isFinite(last)&&now-last<30000){$('growthHint').textContent='More '+action+' XP in '+Math.ceil((30000-(now-last))/1000)+'s.';return false}s.xpCooldowns[action]=now;s.xp+=amount;update();$('growthHint').textContent='+'+amount+' XP · '+action+'!';return true}
 for(var gi=1;gi<=4;gi++){var preload=new Image();preload.src='./assets/growth/Jerry_Growth_'+gi+'.png'+(gi===1?'?v=baby-play-still-20261106':gi===2?'?v=puppy-video-frame-20261108':'?v=portrait-growth-v1')}
 const growthVideos = {
- Baby: {idle:'assets/videos/baby/Jerry_Baby_Idle.mp4',touch:'assets/videos/baby/Jerry_Baby_Touch_Happy.mp4',sleep:'assets/videos/silent/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4',care:'assets/videos/silent/baby/Jerry_Baby_Bath.mp4'},
+ Baby: {dress:'assets/videos/baby/Jerry_Baby_Dress.mp4',idle:'assets/videos/baby/Jerry_Baby_Idle.mp4',touch:'assets/videos/baby/Jerry_Baby_Touch_Happy.mp4',sleep:'assets/videos/silent/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4',care:'assets/videos/silent/baby/Jerry_Baby_Bath.mp4'},
  Puppy: {feed:'assets/videos/silent/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/silent/puppy/Jerry_Puppy_House_02.mp4',sleep:'assets/videos/silent/puppy/Jerry_Puppy_Sleep.mp4',care:'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
 };
 var activeMedia=null,idleTimer=null;
@@ -129,7 +131,7 @@ function startGrowthVideo(action){
  v.poster=$('portrait').style.backgroundImage.slice(5,-2);
  v.classList.toggle('fill-scene',stage==='Baby'&&(action==='dress'||action==='care'||action==='touch'||action==='idle'));
  $('scene').classList.toggle('idle-playing',action==='idle');
- v.src=path;v.hidden=false;$('scene').classList.add('video-sleeping');
+ v.setAttribute('data-action',action);v.src=path;v.hidden=false;$('scene').classList.add('video-sleeping');
  if(v.requestVideoFrameCallback)videoFrameRequest=v.requestVideoFrameCallback(function(){videoFrameRequest=null;reveal()});
  var promise=v.play();if(promise&&promise.catch)promise.catch(fail);
 }
