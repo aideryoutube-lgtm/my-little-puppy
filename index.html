@@ -60,8 +60,8 @@ function renderGrowth(){var i=growthIndex(),g=growthStages[i],next=growthStages[
 function awardXP(action,amount){var now=Date.now(),last=s.xpCooldowns[action];if(Number.isFinite(last)&&now-last<30000){$('growthHint').textContent='More '+action+' XP in '+Math.ceil((30000-(now-last))/1000)+'s.';return false}s.xpCooldowns[action]=now;s.xp+=amount;update();$('growthHint').textContent='+'+amount+' XP · '+action+'!';return true}
 for(var gi=1;gi<=4;gi++){var preload=new Image();preload.src='./assets/growth/Jerry_Growth_'+gi+'.png'+(gi===1?'?v=baby-play-still-20261106':gi===2?'?v=puppy-video-frame-20261108':'?v=portrait-growth-v1')}
 const growthVideos = {
- Baby: {idle:'assets/videos/baby/Jerry_Baby_Idle.mp4',touch:'assets/videos/baby/Jerry_Baby_Touch_Happy.mp4',sleep:'assets/videos/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4',dress:'assets/videos/baby/Jerry_Baby_Play_02.mp4',care:'assets/videos/baby/Jerry_Baby_Bath.mp4'},
- Puppy: {feed:'assets/videos/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/puppy/Jerry_Puppy_House_02.mp4',sleep:'assets/videos/puppy/Jerry_Puppy_Sleep.mp4',care:'assets/videos/puppy/Jerry_Puppy_Bath.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
+ Baby: {idle:'assets/videos/baby/Jerry_Baby_Idle.mp4',touch:'assets/videos/baby/Jerry_Baby_Touch_Happy.mp4',sleep:'assets/videos/compat/baby/Jerry_Baby_Sleep_4s.mp4',feed:'assets/videos/baby/Jerry_Baby_Feed_4s.mp4',house:'assets/videos/baby/Jerry_Baby_House_4s.mp4',play:'assets/videos/baby/Jerry_Baby_Play_4s.mp4',dress:'assets/videos/compat/baby/Jerry_Baby_Play_02.mp4',care:'assets/videos/compat/baby/Jerry_Baby_Bath.mp4'},
+ Puppy: {feed:'assets/videos/compat/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/compat/puppy/Jerry_Puppy_House_02.mp4',sleep:'assets/videos/compat/puppy/Jerry_Puppy_Sleep.mp4',care:'assets/videos/compat/puppy/Jerry_Puppy_Bath.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
 };
 var activeMedia=null,idleTimer=null;
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
