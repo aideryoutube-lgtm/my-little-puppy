@@ -119,7 +119,7 @@ document.addEventListener('pointerdown',function(e){
 },true);
 document.addEventListener('keydown',noteActivity,true);
 document.addEventListener('click',function(e){
- if(Date.now()-lastActionTouch<700&&actionButtonFromEvent(e)){e.preventDefault();e.stopPropagation();return}
+ if(e.isTrusted&&Date.now()-lastActionTouch<700&&actionButtonFromEvent(e)){e.preventDefault();e.stopPropagation();return}
  noteActivity(e);
 },true);
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
