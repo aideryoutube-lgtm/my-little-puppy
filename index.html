@@ -89,39 +89,16 @@ const IDLE_DELAY_MS=3000; // Shared by every growth stage with an Idle clip.
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
 function idleAllowed(){return !!growthVideos[growthStages[growthIndex()].name].idle&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
 function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},IDLE_DELAY_MS)}
-function actionButtonFromPoint(x,y){
- var buttons=document.querySelectorAll('.scene-actions button');
- for(var i=0;i<buttons.length;i++){var b=buttons[i],r=b.getBoundingClientRect();
-  if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return b;
- }
- return null;
+// Use native button click handlers. Do not intercept or cancel touch events on iOS.
+function noteActivity(e){
+ cancelIdle();
+ if(e.target&&e.target.closest&&e.target.closest('.scene-actions button'))return;
+ if(activeMedia&&activeMedia.action==='idle'){if(e.type==='pointerdown')return;stopSleepVideo();return}
+ scheduleIdle();
 }
-function actionButtonFromEvent(e){
- var b=e.target&&e.target.closest?e.target.closest('.scene-actions button'):null;
- return b||(typeof e.clientX==='number'?actionButtonFromPoint(e.clientX,e.clientY):null);
-}
-function noteActivity(e){cancelIdle();if(actionButtonFromEvent(e))return;if(activeMedia&&activeMedia.action==='idle'){if(e.type==='pointerdown')return;stopSleepVideo();return}scheduleIdle()}
-var lastActionTouch=0;
-function triggerActionTap(e,x,y){
- var b=actionButtonFromPoint(x,y);
- if(!b||b.disabled)return false;
- e.preventDefault();e.stopPropagation();cancelIdle();lastActionTouch=Date.now();
- b.click();return true;
-}
-// Resolve touches by coordinates, even if iOS video compositing reports the video as target.
-document.addEventListener('touchstart',function(e){
- if(e.touches.length===1)triggerActionTap(e,e.touches[0].clientX,e.touches[0].clientY);
-},{capture:true,passive:false});
-document.addEventListener('pointerdown',function(e){
- if(e.pointerType==='touch'&&Date.now()-lastActionTouch<700)return;
- if(e.isPrimary!==false&&triggerActionTap(e,e.clientX,e.clientY))return;
- noteActivity(e);
-},true);
+document.addEventListener('pointerdown',noteActivity,true);
 document.addEventListener('keydown',noteActivity,true);
-document.addEventListener('click',function(e){
- if(e.isTrusted&&Date.now()-lastActionTouch<700&&actionButtonFromEvent(e)){e.preventDefault();e.stopPropagation();return}
- noteActivity(e);
-},true);
+document.addEventListener('click',noteActivity);
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
 var idlePreload=document.createElement('video');idlePreload.preload='auto';idlePreload.muted=true;idlePreload.playsInline=true;idlePreload.src=growthVideos.Baby.idle;idlePreload.load();
 // Warm the Touch clip cache without touching the active video player.
