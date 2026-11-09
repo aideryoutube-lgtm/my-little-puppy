@@ -89,8 +89,10 @@ const IDLE_DELAY_MS=3000; // Shared by every growth stage with an Idle clip.
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
 function idleAllowed(){return !!growthVideos[growthStages[growthIndex()].name].idle&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
 function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},IDLE_DELAY_MS)}
-function noteActivity(){cancelIdle();if(activeMedia&&activeMedia.action==='idle'){stopSleepVideo();return}scheduleIdle()}
-['pointerdown','keydown'].forEach(function(type){document.addEventListener(type,noteActivity,true)});
+function noteActivity(e){cancelIdle();if(activeMedia&&activeMedia.action==='idle'){if(e&&e.type==='pointerdown')return;stopSleepVideo();return}scheduleIdle()}
+// Keep the Idle video mounted during pointerdown: removing it before click can cancel iOS Safari's button click.
+document.addEventListener('pointerdown',noteActivity,true);
+document.addEventListener('keydown',noteActivity,true);
 document.addEventListener('click',noteActivity);
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
 var idlePreload=document.createElement('video');idlePreload.preload='auto';idlePreload.muted=true;idlePreload.playsInline=true;idlePreload.src=growthVideos.Baby.idle;idlePreload.load();
