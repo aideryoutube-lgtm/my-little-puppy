@@ -89,12 +89,18 @@ const IDLE_DELAY_MS=3000; // Shared by every growth stage with an Idle clip.
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
 function idleAllowed(){return !!growthVideos[growthStages[growthIndex()].name].idle&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
 function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},IDLE_DELAY_MS)}
-function isActionButton(e){return !!(e.target&&e.target.closest&&e.target.closest('.scene-actions button'))}
-function noteActivity(e){cancelIdle();if(isActionButton(e))return;if(activeMedia&&activeMedia.action==='idle'){if(e.type==='pointerdown')return;stopSleepVideo();return}scheduleIdle()}
-// Action buttons have priority over Idle and all other videos. Interrupt on click capture,
-// not pointerdown, so iOS Safari still delivers the click to the original button.
-document.addEventListener('click',function(e){if(!isActionButton(e))return;cancelIdle();stopSleepVideo()},true);
-document.addEventListener('pointerdown',noteActivity,true);
+function actionButtonFromEvent(e){return e.target&&e.target.closest?e.target.closest('.scene-actions button'):null}
+function noteActivity(e){cancelIdle();if(actionButtonFromEvent(e))return;if(activeMedia&&activeMedia.action==='idle'){if(e.type==='pointerdown')return;stopSleepVideo();return}scheduleIdle()}
+// On iPhone, changing the video layer between touchstart and click can swallow the tap.
+// Dispatch the selected button's existing click handler synchronously on pointerdown.
+// preventDefault suppresses the later synthetic click, avoiding double XP/actions.
+document.addEventListener('pointerdown',function(e){
+ var button=actionButtonFromEvent(e);
+ if(button&&!button.disabled&&e.isPrimary!==false){
+  e.preventDefault();cancelIdle();button.click();return;
+ }
+ noteActivity(e);
+},true);
 document.addEventListener('keydown',noteActivity,true);
 document.addEventListener('click',noteActivity);
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
