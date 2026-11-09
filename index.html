@@ -85,11 +85,11 @@ const growthVideos = {
  Puppy: {dress:'assets/videos/puppy/Jerry_Puppy_Dress.mp4',idle:'assets/videos/puppy/Jerry_Puppy_Idle.mp4',touch:'assets/videos/puppy/Jerry_Puppy_Touch_Happy.mp4',feed:'assets/videos/silent/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/silent/puppy/Jerry_Puppy_House_02.mp4',sleep:'assets/videos/silent/puppy/Jerry_Puppy_Sleep.mp4',care:'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4'}, Teen: {}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4'}
 };
 var activeMedia=null,idleTimer=null;
-const IDLE_DELAY_MS=1000; // Shared by every growth stage with an Idle clip.
+const IDLE_DELAY_MS=3000; // Shared by every growth stage with an Idle clip.
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
 function idleAllowed(){return !!growthVideos[growthStages[growthIndex()].name].idle&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
 function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},IDLE_DELAY_MS)}
-function noteActivity(){cancelIdle();if(activeMedia&&activeMedia.action==='idle')stopSleepVideo();scheduleIdle()}
+function noteActivity(){cancelIdle();if(activeMedia&&activeMedia.action==='idle'){stopSleepVideo();return}scheduleIdle()}
 ['pointerdown','keydown'].forEach(function(type){document.addEventListener(type,noteActivity,true)});
 document.addEventListener('click',noteActivity);
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
