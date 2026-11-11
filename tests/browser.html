@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>Jerry browser regression checks</title>
+<style>body{font:14px system-ui;margin:20px}iframe{width:390px;height:844px;border:1px solid #ccc}pre{white-space:pre-wrap}button{padding:12px}</style>
+<h1>Jerry browser regression checks</h1><p>Uses temporary test progress and restores the original saved data when finished. Keep this page open until the checks finish.</p>
+<button id="run">Run all three stages</button><pre id="result">Ready</pre><iframe id="game" title="Game under test" src="about:blank"></iframe>
+<script>
+const out=document.querySelector('#result'),frame=document.querySelector('#game'),run=document.querySelector('#run');
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const check=(yes,msg)=>{if(!yes)throw Error(msg)};
+async function until(fn,msg,timeout=16000){const end=Date.now()+timeout;while(Date.now()<end){if(fn())return;await wait(30)}throw Error(msg)}
+run.onclick=async()=>{
+ run.disabled=true;out.textContent='Running…\n';const original=localStorage.getItem('jerry-save-v1'),failures=[];let count=0;
+ try{
+ for(const [xp,stage]of [[0,'Baby'],[100,'Puppy'],[300,'Adult'],[600,'Adult']]){
+  localStorage.setItem('jerry-save-v1',JSON.stringify({coins:999999999,xp,stage:0,hunger:45,fun:50,clean:55}));
+  await new Promise(resolve=>{frame.onload=resolve;frame.src='../?browser-test='+xp});
+  const d=frame.contentDocument,w=frame.contentWindow,v=d.querySelector('#sleepVideo'),scene=d.querySelector('#scene'),portrait=d.querySelector('#portrait');
+  w.addEventListener('error',e=>failures.push(e.message));
+  const box=()=>JSON.stringify(scene.getBoundingClientRect().toJSON()),initial=box();
+  check(scene.dataset.growthStage===stage,stage+' growth stage');
+  await until(()=>v.dataset.action==='idle'&&scene.classList.contains('video-ready'),'Idle failed at '+xp);
+  for(const [id,action]of [['food','feed'],['ball','play'],['bath','care'],['dress','dress'],['home','house'],['sleep','sleep']]){
+   d.getElementById(id).click();
+   await until(()=>v.dataset.action===action&&!v.paused&&v.currentTime>0&&scene.classList.contains('video-ready'),stage+' '+action+' failed');
+   check(!v.error&&v.muted&&v.playsInline,stage+' media error or inline/mute flag');
+   check(box()===initial,stage+' scene moved');count++;
+  }
+  // A real hit-test must still reach Touch while an action video is visible.
+  const rect=portrait.getBoundingClientRect(),hit=d.elementFromPoint(rect.x+rect.width*.65,rect.y+rect.height*.5);
+  check(hit===portrait,stage+' Touch hit target blocked');hit.click();
+  await until(()=>v.dataset.action==='touch'&&scene.classList.contains('video-ready'),stage+' Touch failed');
+  v.currentTime=v.duration-.1;await until(()=>v.hidden,stage+' did not restore still');
+  check(w.getComputedStyle(portrait).opacity==='1',stage+' still invisible');
+  const saved=JSON.parse(localStorage.getItem('jerry-save-v1'));
+  await new Promise(resolve=>{frame.onload=resolve;w.location.reload()});
+  check(JSON.parse(localStorage.getItem('jerry-save-v1')).xp===saved.xp,stage+' XP reload');
+  frame.contentWindow.confirm=()=>true;frame.contentDocument.querySelector('#resetGrowth').click();
+  const reset=JSON.parse(localStorage.getItem('jerry-save-v1'));
+  check(reset.xp===0&&reset.coins===saved.coins&&reset.hunger===saved.hunger&&reset.fun===saved.fun&&reset.clean===saved.clean,stage+' Restart changed other state');
+  out.textContent+=stage+' ('+xp+' XP): PASS — six actions, Idle interruption, Touch hit-test, still return, fixed scene, reload, Restart\n';
+ }
+ check(!failures.length,failures.join('\n'));out.textContent+='PASS: '+count+' action playback checks. Original saved progress restored.';
+ }catch(e){out.textContent+='FAIL: '+e.message;console.error(e)}
+ finally{if(original===null)localStorage.removeItem('jerry-save-v1');else localStorage.setItem('jerry-save-v1',original);run.disabled=false}
+};
+</script>
