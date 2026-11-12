@@ -15,6 +15,7 @@ run.onclick=async()=>{
   await new Promise(resolve=>{frame.onload=resolve;frame.src='../?browser-test='+xp});
   const d=frame.contentDocument,w=frame.contentWindow,v=d.querySelector('#sleepVideo'),scene=d.querySelector('#scene'),portrait=d.querySelector('#portrait');
   w.addEventListener('error',e=>failures.push(e.message));
+  scene.scrollIntoView({block:'center'});
   const box=()=>JSON.stringify(scene.getBoundingClientRect().toJSON()),initial=box();
   check(scene.dataset.growthStage===stage,stage+' growth stage');
   await until(()=>v.dataset.action==='idle'&&scene.classList.contains('video-ready'),'Idle failed at '+xp);
@@ -40,6 +41,6 @@ run.onclick=async()=>{
  }
  check(!failures.length,failures.join('\n'));out.textContent+='PASS: '+count+' action playback checks. Original saved progress restored.';
  }catch(e){out.textContent+='FAIL: '+e.message;console.error(e)}
- finally{if(original===null)localStorage.removeItem('jerry-save-v1');else localStorage.setItem('jerry-save-v1',original);run.disabled=false}
+ finally{await new Promise(resolve=>{frame.onload=resolve;frame.src='about:blank'});if(original===null)localStorage.removeItem('jerry-save-v1');else localStorage.setItem('jerry-save-v1',original);run.disabled=false}
 };
 </script>
