@@ -18,7 +18,30 @@ else{html=fitting(s)+`<nav class="shop-tabs" aria-label="Shop categories">${['Ha
 $('worldContent').innerHTML=html;}
 function open(which){lastFocus=document.activeElement;section=which;if(which==='inventory'){const owned=api.snapshot().world.owned;preview=owned[0]||null;if(preview)category=C.catalog.find(i=>i.id===preview).category;}api.open();$('worldOverlay').hidden=false;renderDialog();$('worldNotice').textContent=window.pawtopiaMigrationError?'Saving is unavailable. Please check device storage before buying.':'';$('worldOverlay').querySelector('.world-panel').focus();}
 function close(){if($('worldOverlay').hidden)return;$('worldOverlay').hidden=true;api.close();lastFocus?.focus();}
-function react(action){api.stop();if(action==='food'){open('food');return;}if(action==='games'){api.stop();$('miniLaunch').click();return;}if(action==='water'){if(transact('water').ok){api.action('touch');burst('💧');}return;}if(action==='night'){transact('night');api.restore();return;}if(action==='sleep'){$('sleep').click();message('Sweet dreams, Jerry! Sleep restores Energy.');return;}if(action==='play'){$('ball').click();burst('🎾');message('Let’s play, Jerry!');return;}if(action==='bath'){$('bath').click();bubbles();message('Bath time! So fresh and fluffy.');return;}if(action==='bubbles'){bubbles();message('Pop, pop! So many bubbles.');api.restore();return;}if(action==='towel'){burst('✨');sound('happy');message('A soft towel for fluffy paws.');api.restore();return;}if(action==='duck'){sound('happy');burst('🦆');message('Squeak! Jerry’s little bath buddy.');api.restore();return;}api.action('touch');burst(action==='cuddle'?'💛':'✨');sound('happy');message(action==='cuddle'?'Cozy cuddles for Jerry!':'Jerry loves his toys!');}
+let roomVideoReturn=null;
+function playRoomVideo(action){
+ const room=api.snapshot().world.room;
+ roomVideoReturn={room,action};
+ api.stop();
+ const target={feed:'food',sleep:'sleep',care:'bath',play:'ball'}[action];
+ if(!target)return;
+ const scene=$('scene');
+ scene.scrollIntoView({behavior:'instant',block:'start'});
+ $(target).click();
+ // Existing action handlers own XP, needs, and the stage-specific MP4.
+ // Video-ended and error events restore the room without duplicating Jerry.
+}
+$('sleepVideo').addEventListener('ended',()=>{
+ if(!roomVideoReturn)return;
+ const returnTo=roomVideoReturn.room;roomVideoReturn=null;
+ if(api.snapshot().world.room===returnTo)$('worldHome').scrollIntoView({behavior:'instant',block:'start'});
+});
+$('sleepVideo').addEventListener('error',()=>{
+ if(!roomVideoReturn)return;
+ roomVideoReturn=null;
+ $('worldHome').scrollIntoView({behavior:'instant',block:'start'});
+});
+function react(action){api.stop();if(action==='food'){open('food');return;}if(action==='games'){api.stop();$('miniLaunch').click();return;}if(action==='water'){if(transact('water').ok){api.action('touch');burst('💧');}return;}if(action==='night'){transact('night');api.restore();return;}if(action==='sleep'){playRoomVideo('sleep');message('Sweet dreams, Jerry! Sleep restores Energy.');return;}if(action==='play'){playRoomVideo('play');burst('🎾');message('Let’s play, Jerry!');return;}if(action==='bath'){playRoomVideo('care');bubbles();message('Bath time! So fresh and fluffy.');return;}if(action==='bubbles'){bubbles();message('Pop, pop! So many bubbles.');api.restore();return;}if(action==='towel'){burst('✨');sound('happy');message('A soft towel for fluffy paws.');api.restore();return;}if(action==='duck'){sound('happy');burst('🦆');message('Squeak! Jerry’s little bath buddy.');api.restore();return;}api.action('touch');burst(action==='cuddle'?'💛':'✨');sound('happy');message(action==='cuddle'?'Cozy cuddles for Jerry!':'Jerry loves his toys!');}
 $('roomNav').onclick=e=>{const button=e.target.closest('[data-room]');if(!button)return;const result=transact('room',button.dataset.room);if(result.ok){api.stop();$('scene').classList.remove('world-bubbles');if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&$('roomCanvas').animate)$('roomCanvas').animate([{opacity:.65},{opacity:1}],{duration:220});api.restore();}};
 $('roomProps').onclick=$('placedFurniture').onclick=e=>{const b=e.target.closest('[data-prop]');if(b)react(b.dataset.prop);};
 $('worldContent').onclick=e=>{const b=e.target.closest('button');if(!b)return;for(const type of ['buy','equip','unequip'])if(b.dataset[type]){preview=b.dataset[type];transact(type,preview);return;}if(b.dataset.preview){preview=b.dataset.preview;renderDialog();return;}if(b.dataset.category){category=b.dataset.category;renderDialog();return;}if(b.dataset.food){if(foodLock)return;foodLock=true;setTimeout(()=>foodLock=false,450);const result=transact('food',b.dataset.food);if(result.ok){close();api.action('feed');message(result.message);burst('💛');}return;}if(b.dataset.setting){transact(b.dataset.setting,b.dataset.setting==='sound'?!api.snapshot().world.sound:undefined);}};
