@@ -18,34 +18,26 @@ else{html=fitting(s)+`<nav class="shop-tabs" aria-label="Shop categories">${['Ha
 $('worldContent').innerHTML=html;}
 function open(which){lastFocus=document.activeElement;section=which;if(which==='inventory'){const owned=api.snapshot().world.owned;preview=owned[0]||null;if(preview)category=C.catalog.find(i=>i.id===preview).category;}api.open();$('worldOverlay').hidden=false;renderDialog();$('worldNotice').textContent=window.pawtopiaMigrationError?'Saving is unavailable. Please check device storage before buying.':'';$('worldOverlay').querySelector('.world-panel').focus();}
 function close(){if($('worldOverlay').hidden)return;$('worldOverlay').hidden=true;api.close();lastFocus?.focus();}
-let roomVideoReturn=null;
-const roomJerryFiles={Baby:null,Puppy:'assets/rooms/jerry/67568E86-533A-455C-947D-09DAA4AF27ED.png',Adult:'assets/rooms/jerry/6A967E6E-5DCA-42B8-9F7B-C9ECFE8B51F6.png'};
+// Move the original live scene, never clone its controls or media player.
+const careScene=$('scene'),careAnchor=document.createComment('Living Room care scene');
+careScene.before(careAnchor);
+function mountCareScene(room){
+ const canvas=$('roomCanvas');
+ if(room==='living'){
+  if(careScene.parentNode!==careAnchor.parentNode)careAnchor.after(careScene);
+ }else if(careScene.parentNode!==canvas)canvas.append(careScene);
+}
+
+const roomJerryFiles={Baby:'assets/rooms/jerry/508DBCDC-81F6-4929-9585-F14474462DA0.png',Puppy:'assets/rooms/jerry/67568E86-533A-455C-947D-09DAA4AF27ED.png',Adult:'assets/rooms/jerry/6A967E6E-5DCA-42B8-9F7B-C9ECFE8B51F6.png'};
 const roomJerryStatus={};
-function updateRoomJerry(){const canvas=$('roomCanvas'),state=api.snapshot(),room=state.world.room,stage=state.growthStage||'Baby';let img=$('roomJerry');if(!img){img=document.createElement('img');img.id='roomJerry';img.alt='Jerry — '+stage;img.decoding='async';img.draggable=false;img.hidden=true;canvas.append(img);}if(room==='living'||stage==='Baby'||!roomJerryFiles[stage]){img.hidden=true;return;}const file=roomJerryFiles[stage];img.alt='Jerry — '+stage;img.dataset.stage=stage;img.dataset.room=room;if(img.dataset.source!==file){img.dataset.source=file;img.hidden=true;img.onload=()=>{if(img.dataset.source===file)img.hidden=false;};img.onerror=()=>{img.hidden=true;roomJerryStatus[stage]='missing';};img.src=file;}else if(img.complete&&img.naturalWidth>0)img.hidden=false;
+function updateRoomJerry(){const canvas=$('roomCanvas'),state=api.snapshot(),room=state.world.room,stage=state.growthStage||'Baby';mountCareScene(room);let img=$('roomJerry');if(!img){img=document.createElement('img');img.id='roomJerry';img.alt='Jerry — '+stage;img.decoding='async';img.draggable=false;img.hidden=true;canvas.append(img);}if(room==='living'||!roomJerryFiles[stage]){img.hidden=true;return;}const file=roomJerryFiles[stage];img.alt='Jerry — '+stage;img.dataset.stage=stage;img.dataset.room=room;if(img.dataset.source!==file){img.dataset.source=file;img.hidden=true;delete canvas.dataset.jerryReady;img.onload=()=>{if(img.dataset.source===file){img.hidden=false;canvas.dataset.jerryReady='true';}};img.onerror=()=>{img.hidden=true;delete canvas.dataset.jerryReady;roomJerryStatus[stage]='missing';};img.src=file;}else if(img.complete&&img.naturalWidth>0){img.hidden=false;canvas.dataset.jerryReady='true';}
 }
 
 function playRoomVideo(action){
- const room=api.snapshot().world.room;
- roomVideoReturn={room,action};
  api.stop();
  const target={feed:'food',sleep:'sleep',care:'bath',play:'ball'}[action];
- if(!target)return;
- const scene=$('scene');
- scene.scrollIntoView({behavior:'instant',block:'start'});
- $(target).click();
- // Existing action handlers own XP, needs, and the stage-specific MP4.
- // Video-ended and error events restore the room without duplicating Jerry.
+ if(target)$(target).click();
 }
-$('sleepVideo').addEventListener('ended',()=>{
- if(!roomVideoReturn)return;
- const returnTo=roomVideoReturn.room;roomVideoReturn=null;
- if(api.snapshot().world.room===returnTo)$('worldHome').scrollIntoView({behavior:'instant',block:'start'});
-});
-$('sleepVideo').addEventListener('error',()=>{
- if(!roomVideoReturn)return;
- roomVideoReturn=null;
- $('worldHome').scrollIntoView({behavior:'instant',block:'start'});
-});
 function react(action){api.stop();if(action==='food'){open('food');return;}if(action==='games'){api.stop();$('miniLaunch').click();return;}if(action==='water'){if(transact('water').ok){api.action('touch');burst('💧');}return;}if(action==='night'){transact('night');api.restore();return;}if(action==='sleep'){playRoomVideo('sleep');message('Sweet dreams, Jerry! Sleep restores Energy.');return;}if(action==='play'){playRoomVideo('play');burst('🎾');message('Let’s play, Jerry!');return;}if(action==='bath'){playRoomVideo('care');bubbles();message('Bath time! So fresh and fluffy.');return;}if(action==='bubbles'){bubbles();message('Pop, pop! So many bubbles.');api.restore();return;}if(action==='towel'){burst('✨');sound('happy');message('A soft towel for fluffy paws.');api.restore();return;}if(action==='duck'){sound('happy');burst('🦆');message('Squeak! Jerry’s little bath buddy.');api.restore();return;}api.action('touch');burst(action==='cuddle'?'💛':'✨');sound('happy');message(action==='cuddle'?'Cozy cuddles for Jerry!':'Jerry loves his toys!');}
 $('roomNav').onclick=e=>{const button=e.target.closest('[data-room]');if(!button)return;const result=transact('room',button.dataset.room);if(result.ok){api.stop();$('scene').classList.remove('world-bubbles');if(!matchMedia('(prefers-reduced-motion: reduce)').matches&&$('roomCanvas').animate)$('roomCanvas').animate([{opacity:.65},{opacity:1}],{duration:220});api.restore();}};
 $('roomProps').onclick=$('placedFurniture').onclick=e=>{const b=e.target.closest('[data-prop]');if(b)react(b.dataset.prop);};
