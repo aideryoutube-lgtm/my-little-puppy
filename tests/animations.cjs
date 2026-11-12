@@ -13,7 +13,7 @@ function game(xp=0){
  const saved=new Map([['jerry-save-v1',JSON.stringify({coins:100,xp})]]);
  const context={document:{getElementById:element,createElement:()=>element('preload'+seq++),addEventListener(){},hidden:false},window:{location:{search:''}},localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},Image:function(){},URLSearchParams,Date,Number,Math,JSON,confirm:()=>true,console:{warn:(...x)=>logs.push(x),error:(...x)=>logs.push(x)},setTimeout:(cb,ms)=>{timers.set(++seq,{cb,ms});return seq},clearTimeout:id=>timers.delete(id),setInterval:()=>0,clearInterval(){},requestAnimationFrame:cb=>{cb();return 1},cancelAnimationFrame(){}};
  vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
- return {el:element,saved,logs,timers,state:()=>JSON.parse(saved.get('jerry-save-v1')),frame(){const v=element('sleepVideo');v.readyState=4;v.currentTime=.1;v.frame?.();}};
+ return {api:context.window.pawtopiaMini,el:element,saved,logs,timers,state:()=>JSON.parse(saved.get('jerry-save-v1')),frame(){const v=element('sleepVideo');v.readyState=4;v.currentTime=.1;v.frame?.();}};
 }
 const actions={food:'Feed',sleep:'Sleep',bath:'Bath',ball:'Play',dress:'Dress',home:'House'};
 for(const xp of [0,100,600])for(const [id,action]of Object.entries(actions))test(`${xp===600?'Adult':xp?'Puppy':'Baby'} ${id}: mapping, first frame and return`,()=>{
@@ -44,3 +44,5 @@ test('all three stages use one-second Idle and yield to the first action click',
 
 test('migration preserves XP at all old boundaries and keeps the Adult still and Sleep',()=>{for(const [xp,stage]of [[99,'Baby'],[100,'Puppy'],[299,'Puppy'],[300,'Adult'],[599,'Adult'],[600,'Adult'],[2000,'Adult']]){const g=game(xp);assert.equal(g.state().xp,xp);assert.equal(g.state().growthStage,stage);if(stage==='Adult'){assert.match(g.el('portrait').style.backgroundImage,/Jerry_Growth_4/);g.el('sleep').click();assert.equal(g.el('sleepVideo').src,'Jerry_Sleep_Cropped.mp4')}}});
 test('no global capturing pointer, key or click listeners are installed',()=>{assert.doesNotMatch(html,/document\.addEventListener\(['"](?:pointerdown|keydown|click)/)});
+
+test('Bone Catch rewards persist once per round, cap at 10, and preserve all pet progress',()=>{const g=game(160),before=g.state();assert.equal(before.coins,100);assert.equal(g.api.reward('round-1',29),true);assert.equal(g.state().coins,105);assert.equal(g.state().boneBest,29);assert.equal(g.api.reward('round-1',29),false);assert.equal(g.state().coins,105);g.api.reward('round-2',999);assert.equal(g.state().coins,115);g.api.reward('round-3',-5);assert.equal(g.state().coins,115);assert.equal(g.state().xp,before.xp);assert.equal(g.state().hunger,before.hunger);assert.equal(g.state().growthStage,before.growthStage);});
