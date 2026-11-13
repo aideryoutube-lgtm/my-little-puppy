@@ -2,6 +2,13 @@
 .room-caption span{display:block;min-height:30px}#worldMessage{height:42px;overflow:auto;line-height:15px}.world-energy{min-height:20px}.world-nav button:focus-visible,.room-prop:focus-visible,#roomNav button:focus-visible{outline:3px solid #8561af;outline-offset:2px}
 main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 
+/* Room anchors mark the floor under Jerry’s paws, in background coordinates. */
+.room-canvas{--jerry-center:50%;--jerry-floor:25%}
+.room-living{--jerry-floor:28%}
+.room-kitchen{--jerry-floor:8%}
+.room-bedroom{--jerry-floor:21%}
+.room-bathroom{--jerry-floor:22%}
+
 /* One room canvas, one persistent care scene, five original backgrounds. */
 .room-canvas{position:relative;aspect-ratio:941/1672;min-height:0;padding:0;border:3px solid white;border-radius:21px;overflow:hidden;background-color:#ead5b8;background-size:contain;background-position:center;background-repeat:no-repeat}
 .room-living{background-image:url('./assets/rooms/F958EAAC-B020-4970-BDBC-477AE9764AC6.png')}
@@ -13,12 +20,12 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 .room-canvas > #scene{position:absolute!important;inset:0!important;margin:0!important;width:100%!important;height:100%!important;aspect-ratio:auto!important;box-sizing:border-box!important;border:0;border-radius:0;box-shadow:none;background:transparent!important;z-index:5;pointer-events:none}
 .room-canvas > #scene #portrait{background-image:none!important;pointer-events:auto}
 .room-canvas > #scene .scene-actions{pointer-events:auto;width:clamp(44px,13vw,56px)}
-#scene #roomJerry{position:absolute;z-index:2;object-fit:contain;pointer-events:none;width:42%;height:42%;left:30%;bottom:12%;filter:drop-shadow(0 5px 5px #33251640)}
+#scene #roomJerry{position:absolute;z-index:2;object-fit:contain;object-position:center bottom;pointer-events:none;width:42%;height:42%;left:calc(var(--jerry-center) - 21%);bottom:var(--jerry-floor);filter:drop-shadow(0 5px 5px #33251640)}
 #scene #roomJerry[hidden]{display:none}
 #scene #roomJerry[data-stage="Baby"]{transform:scale(.76);transform-origin:bottom center}
 #scene #roomJerry[data-stage="Puppy"]{transform:scale(.9);transform-origin:bottom center}
 #scene.video-ready #roomJerry{visibility:hidden}
-.room-canvas > #scene .sleep-video{left:24%!important;top:auto!important;bottom:12%!important;width:57%!important;height:46%!important;object-fit:contain!important;object-position:center bottom!important;background:transparent!important}
+.room-canvas > #scene .sleep-video{left:calc(var(--jerry-center) - 28.5%)!important;top:auto!important;bottom:var(--jerry-floor)!important;width:57%!important;height:46%!important;object-fit:contain!important;object-position:center bottom!important;background:transparent!important}
 .room-canvas > #scene .growth,.room-canvas > #scene .status{pointer-events:none}
 #placedFurniture{position:absolute;inset:0;pointer-events:none;z-index:6}
 #placedFurniture .placed-furniture{pointer-events:auto}
@@ -30,7 +37,7 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 #jerry3D[hidden]{display:none}
 .scene.jerry-3d-ready #portrait{background-image:none!important;pointer-events:none!important}
 .room-canvas.jerry-3d-ready #roomJerry{visibility:hidden!important}
-.room-canvas > #scene #jerry3D{left:24%;bottom:9%;width:57%;height:46%}
+.room-canvas > #scene #jerry3D{left:calc(var(--jerry-center) - 28.5%);bottom:var(--jerry-floor);width:57%;height:46%}
 .scene.video-ready #jerry3D{visibility:hidden;pointer-events:none}
 
 /* Pawtopia 3.1 clean room UI: hide redundant copy and duplicate launchers, retain functional DOM. */
