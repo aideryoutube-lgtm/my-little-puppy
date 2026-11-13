@@ -114,3 +114,7 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 .kitchen-fridge-panel button:last-child{background:#e9f3fa}
 @keyframes fridgePanelIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
 @media(prefers-reduced-motion:reduce){.kitchen-fridge-panel{animation:none}}
+
+/* Kitchen bowls sit at floor level, not at mid-wall. Enlarge touch targets for iPhone. */
+.kitchen-food-hotspot{left:22%!important;top:56%!important;width:21%!important;height:13%!important;z-index:2!important}
+.kitchen-water-hotspot{left:9%!important;top:56%!important;width:16%!important;height:13%!important;z-index:2!important}
