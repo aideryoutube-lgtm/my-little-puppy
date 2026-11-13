@@ -129,3 +129,6 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 
 /* Fill the entire portrait kitchen canvas without cropping the fridge or bowls. */
 .room-canvas.room-kitchen,.room-canvas.room-kitchen.kitchen-fridge-is-open{background-size:100% 100%!important;background-position:center center!important;background-repeat:no-repeat!important}
+
+/* Kitchen-only: fill portrait room while keeping source image proportions. */
+.room-canvas.room-kitchen,.room-canvas.room-kitchen.kitchen-fridge-is-open{background-size:cover!important;background-position:center center!important;background-repeat:no-repeat!important}
