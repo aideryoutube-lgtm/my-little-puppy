@@ -63,3 +63,13 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 .settings-reset strong{display:block;font-size:16px;margin-bottom:5px}
 .settings-reset p{font-size:13px;line-height:1.45;margin:5px 0 12px}
 .settings-reset button{width:100%;min-height:46px;border:2px solid #c88955;border-radius:14px;background:#fff4e4;color:#85431e;font-size:15px;font-weight:800;cursor:pointer;touch-action:manipulation}
+
+/* Mobile wardrobe navigation: clear Shop / owned-items switch and category counts. */
+.wardrobe-switch{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 8px}
+.wardrobe-switch button{min-height:44px;border:2px solid #f4cf8b;border-radius:14px;background:#fff9e8;font-size:13px;font-weight:800;box-shadow:0 3px 0 #d4ac70}
+.wardrobe-switch button[aria-pressed=true]{background:linear-gradient(#b7f2ff,#7fd6df);border-color:#7fc5d0;box-shadow:0 3px 0 #4e9ca9}
+.category-count{display:inline-block;padding:1px 5px;margin-left:2px;border-radius:10px;background:#ffffffb8;font-size:10px}
+.shop-tabs button{white-space:nowrap;min-height:42px}
+.world-product{min-height:66px}
+.world-product>button:last-child{min-width:74px}
+@media(max-width:380px){.shop-tabs button{font-size:10px;padding:6px 5px}.wardrobe-switch button{font-size:12px}}
