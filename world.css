@@ -162,3 +162,20 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 .water-kitchen .water-stream{left:19%!important;top:32%!important;height:6.8%!important;width:17px!important}
 .water-bathroom .water-tap-button{left:16%!important;right:auto!important;top:12%!important;width:30px!important;height:30px!important;font-size:16px!important;opacity:.72!important}
 .water-bathroom .water-stream{left:25%!important;right:auto!important;top:15%!important;height:14%!important;width:21px!important}
+
+
+/* Interactive bowls painted in the lower-right corner of the Kitchen background. */
+#kitchenBowlInteraction{position:absolute;inset:0;z-index:13;pointer-events:none}
+#kitchenBowlInteraction[hidden]{display:none!important}
+#kitchenBowlInteraction .bowl-touch{position:absolute;right:1%;width:20%;height:8%;min-height:44px;pointer-events:auto;touch-action:manipulation;background:transparent!important;border:0!important;padding:0!important;box-shadow:none!important;border-radius:45%!important}
+#kitchenBowlInteraction .bowl-food{top:76%}
+#kitchenBowlInteraction .bowl-water{top:84%}
+#kitchenBowlInteraction .bowl-touch:focus-visible{outline:3px solid #fff55b!important;outline-offset:1px}
+#kitchenBowlInteraction .bowl-effect{display:none;position:absolute;right:4%;top:75%;width:15%;height:16%;pointer-events:none;border-radius:45%;border:3px solid #ffed8b;box-shadow:0 0 14px 5px #ffe79a99;animation:bowlPulse .65s ease-in-out 2}
+#kitchenBowlInteraction.bowl-eating .bowl-effect{display:block}
+#kitchenBowlInteraction.bowl-drinking .bowl-effect{display:block;border-color:#84f2ff;box-shadow:0 0 14px 5px #75dfff99}
+#kitchenBowlInteraction.bowl-eating .bowl-effect:after{content:'🍖 ✨';position:absolute;top:-30px;right:0;font-size:25px;animation:bowlFloat 1.2s ease-out both}
+#kitchenBowlInteraction.bowl-drinking .bowl-effect:after{content:'💧 💦';position:absolute;top:20px;right:0;font-size:25px;animation:bowlFloat 1.2s ease-out both}
+@keyframes bowlPulse{0%,100%{opacity:.25;transform:scale(.9)}50%{opacity:1;transform:scale(1.08)}}
+@keyframes bowlFloat{from{opacity:0;transform:translateY(10px)}40%{opacity:1}to{opacity:0;transform:translateY(-25px)}}
+@media(prefers-reduced-motion:reduce){#kitchenBowlInteraction .bowl-effect,#kitchenBowlInteraction .bowl-effect:after{animation:none}}
