@@ -18,14 +18,12 @@ else{html=fitting(s)+`<nav class="shop-tabs" aria-label="Shop categories">${['Ha
 $('worldContent').innerHTML=html;}
 function open(which){lastFocus=document.activeElement;section=which;if(which==='inventory'){const owned=api.snapshot().world.owned;preview=owned[0]||null;if(preview)category=C.catalog.find(i=>i.id===preview).category;}api.open();$('worldOverlay').hidden=false;renderDialog();$('worldNotice').textContent=window.pawtopiaMigrationError?'Saving is unavailable. Please check device storage before buying.':'';$('worldOverlay').querySelector('.world-panel').focus();}
 function close(){if($('worldOverlay').hidden)return;$('worldOverlay').hidden=true;api.close();lastFocus?.focus();}
-// Move the original live scene, never clone its controls or media player.
-const careScene=$('scene'),careAnchor=document.createComment('Living Room care scene');
-careScene.before(careAnchor);
-function mountCareScene(room){
+// A single live Jerry scene belongs to the active room, including Living Room.
+// Move rather than clone it, so videos, growth meters and controls stay unique.
+const careScene=$('scene');
+function mountCareScene(){
  const canvas=$('roomCanvas');
- if(room==='living'){
-  if(careScene.parentNode!==careAnchor.parentNode)careAnchor.after(careScene);
- }else if(careScene.parentNode!==canvas)canvas.append(careScene);
+ if(careScene.parentNode!==canvas)canvas.append(careScene);
 }
 
 const roomJerryFiles={Baby:'assets/rooms/jerry/508DBCDC-81F6-4929-9585-F14474462DA0.png',Puppy:'assets/rooms/jerry/67568E86-533A-455C-947D-09DAA4AF27ED.png',Adult:'assets/rooms/jerry/6A967E6E-5DCA-42B8-9F7B-C9ECFE8B51F6.png'};
