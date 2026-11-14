@@ -204,15 +204,14 @@ const growthVideos = {
  Puppy: {play:'assets/videos/puppy/Jerry_Puppy_Play.mp4',dress:'assets/videos/puppy/Jerry_Puppy_Dress.mp4',idle:'assets/videos/puppy/Jerry_Puppy_Idle.mp4',touch:'assets/videos/puppy/Jerry_Puppy_Touch_Happy.mp4',feed:'assets/videos/silent/puppy/Jerry_Puppy_Feed.mp4',house:'assets/videos/silent/puppy/Jerry_Puppy_House_02.mp4',sleep:'assets/videos/silent/puppy/Jerry_Puppy_Sleep.mp4',care:'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4'}, Adult: {sleep:'Jerry_Sleep_Cropped.mp4',play:'assets/videos/adult/Jerry_Adult_Play.mp4',feed:'assets/videos/adult/Jerry_Adult_Feed.mp4',care:'assets/videos/adult/Jerry_Adult_Bath.mp4',dress:'assets/videos/adult/Jerry_Adult_Dress.mp4',house:'assets/videos/adult/Jerry_Adult_House.mp4',idle:'assets/videos/adult/Jerry_Adult_Idle.mp4',touch:'assets/videos/adult/Jerry_Adult_Touch_Happy.mp4'}
 };
 var activeMedia=null,idleTimer=null;
-const IDLE_DELAY_MS=1000; // Shared by every growth stage with an Idle clip.
+// Automatic inactivity videos are disabled for every growth stage.
 function cancelIdle(){clearTimeout(idleTimer);idleTimer=null}
-function idleAllowed(){return !(window.pawtopia3D&&window.pawtopia3D.active())&& !worldModal&&!!growthVideos[growthStages[growthIndex()].name].idle&&!document.hidden&&!activeMedia&&$('shopOverlay').hidden&&$('miniOverlay').hidden}
-function scheduleIdle(){cancelIdle();if(!idleAllowed())return;idleTimer=setTimeout(function(){idleTimer=null;if(idleAllowed())startGrowthVideo('idle')},IDLE_DELAY_MS)}
+function idleAllowed(){return false}
+function scheduleIdle(){cancelIdle()}
 function noteActivity(){cancelIdle();if(activeMedia&&activeMedia.action==='idle')stopSleepVideo();scheduleIdle()}
 // Activity stays local and never captures or replaces native button clicks.
 ['scene','shopOverlay','miniOverlay'].forEach(function(id){$(id).addEventListener('click',noteActivity)});
 document.addEventListener('visibilitychange',function(){cancelIdle();if(document.hidden){if(activeMedia&&activeMedia.action==='idle')stopSleepVideo()}else scheduleIdle()});
-var idlePreload=document.createElement('video');idlePreload.preload='auto';idlePreload.muted=true;idlePreload.playsInline=true;idlePreload.src=growthVideos.Baby.idle;idlePreload.load();
 // Warm the Touch clip cache without touching the active video player.
 var touchPreload=document.createElement('video');touchPreload.preload='auto';touchPreload.muted=true;touchPreload.playsInline=true;touchPreload.src=growthVideos.Baby.touch;touchPreload.load();
 function stopSleepVideo(){
