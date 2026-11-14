@@ -17,3 +17,5 @@
 
 /* Bubble Rescue campaign: ten compact levels and persistent best stars. */
 .bubble-level-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}.bubble-level-grid button{display:grid;gap:3px;min-height:76px;padding:8px;border:2px solid white;border-radius:17px;background:linear-gradient(#d7f5ff,#a1d9ec);box-shadow:0 3px 0 #649caf}.bubble-level-grid strong{font-size:23px}.bubble-level-grid span{color:#a36c09;font-size:18px;letter-spacing:2px}.bubble-level-grid small{font-size:10px}.bubble-level-grid button:disabled{opacity:.5;box-shadow:none;cursor:default}.bubble-map-summary,.bubble-map-bonus{font-size:13px;line-height:1.4}.bubble-map-bonus{padding:10px;background:#fff0bf;border-radius:13px;font-weight:800}#bubbleNext{width:100%;margin-top:10px;min-height:44px;background:linear-gradient(#c8f3bd,#8dcf94)}
+
+.treasure-level-grid button{background:linear-gradient(#e7f7c5,#aedc8b);box-shadow:0 3px 0 #689b53}.treasure-level-grid small{line-height:1.4}#gameField.field-treasure{min-height:0}#gameField .dig-cell{min-width:0;touch-action:manipulation}
