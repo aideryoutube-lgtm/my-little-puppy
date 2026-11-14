@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),E=require('./game-engine.js');
+function game(){const g=E.create('blast',3,()=>0);E.start(g);return g;}
+let g=game();assert.equal(g.board.length,8);assert.equal(g.tray.length,3);assert.equal(E.reward(g),0);assert.equal(E.action(g,'shape',9),false);assert.equal(E.action(g,'place',64),false);assert.equal(E.action(g,'place',.5),false);
+assert.equal(E.action(g,'place',0),true);assert.equal(g.board[0][0],1);assert.equal(g.tray[0],null);assert.equal(g.selected,1);g.event=null;const state=JSON.stringify(g);assert.equal(E.action(g,'place',0),false);assert.equal(JSON.stringify(g),state);E.action(g,'place',1);E.action(g,'place',2);assert(g.tray.every(Boolean));assert.equal(g.moves,3);
+// Reject overflow and occupied cells without consuming the chosen shape.
+g=game();g.tray=[[[1,1],[1,1]],null,null];g.selected=0;assert.equal(E.action(g,'place',7),false);assert.equal(E.action(g,'place',56),false);assert(g.tray[0]);
+// Clear a row and column simultaneously, including their intersection.
+g=game();g.board[0]=Array(8).fill(1);for(let y=0;y<8;y++)g.board[y][0]=1;g.board[0][0]=0;E.action(g,'place',0);assert.equal(g.lines,2);assert.equal(g.score,201);assert.equal(g.board.flat().filter(Boolean).length,0);assert.equal(g.status,'playing');
+// Completing eight lines wins and grants coins only once through persistence.
+g=game();g.lines=7;g.board[0]=[0,1,1,1,1,1,1,1];E.action(g,'place',0);assert.equal(g.won,true);assert.equal(E.reward(g),10);assert.equal(E.action(g,'place',8),false);
+// No fitting remaining shape ends a round without a reward.
+let lost=game();lost.board=Array.from({length:8},(_,y)=>Array.from({length:8},(_,x)=>(x+y)%2));lost.tray=[[[1]],[[2,2],[2,2]],null];lost.selected=0;E.action(lost,'place',0);assert.equal(lost.status,'over');assert.equal(lost.won,false);assert.equal(E.reward(lost),0);
+g=game();E.pause(g);assert.equal(E.action(g,'place',0),false);E.tick(g,100);assert.equal(g.elapsed,0);E.pause(g);E.tick(g,100);assert.equal(g.status,'playing');assert.equal(g.elapsed,100);
+const html=fs.readFileSync('index.html','utf8'),body=html.split('finish:function(kind,id,score,coins,won){')[1].split('}};')[0];let persisted,full=false;const ctx={s:{coins:90,xp:180},window:{pawtopiaMini:{record:()=>0}},localStorage:{setItem:(k,v)=>{if(full)throw Error('full');persisted=v;}},update:()=>{}};vm.createContext(ctx);vm.runInContext('finish=function(kind,id,score,coins,won){'+body+'}',ctx);assert.equal(ctx.finish('blast','win1',800,10,true),true);assert.equal(ctx.finish('blast','win1',800,10,true),true);assert.equal(ctx.s.coins,100);assert.equal(ctx.s.xp,180);assert.equal(ctx.s.miniGames.blast.wins,1);ctx.s=JSON.parse(persisted);full=true;assert.equal(ctx.finish('blast','win2',800,10,true),false);assert.equal(ctx.s.coins,100);full=false;assert.equal(ctx.finish('blast','win2',800,10,true),true);assert.equal(ctx.s.coins,110);
+console.log('PASS: placement, bounds/overlap rejection, three-shape refill, simultaneous row/column clear, victory, no-move loss, pause/no time limit, saved reward, duplicate protection and retry.');
