@@ -1,0 +1,9 @@
+{
+  "name": "pawtopia-private-preview",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.cjs test-*.cjs",
+    "test:decor": "node --test tests/decor-instances.cjs tests/decor-editor.cjs"
+  },
+  "devDependencies": { "jsdom": "26.1.0" }
+}
