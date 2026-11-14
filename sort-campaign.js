@@ -1,0 +1,12 @@
+/* Authored, solvable Color Sort boards and independent trail progress. */
+(function(root){'use strict';
+const levels=[{"colors":2,"threeStar":7,"twoStar":11,"tubes":[[2,1,2,2],[1,2,1,1],[],[]]},{"colors":2,"threeStar":8,"twoStar":12,"tubes":[[2,1,1,2],[1,2,1,2],[],[]]},{"colors":3,"threeStar":11,"twoStar":15,"tubes":[[2,3,2,1],[1,2,1,3],[1,3,3,2],[],[]]},{"colors":3,"threeStar":12,"twoStar":16,"tubes":[[3,2,3,1],[1,2,1,3],[3,2,2,1],[],[]]},{"colors":3,"threeStar":12,"twoStar":16,"tubes":[[3,2,1,3],[1,3,2,3],[1,2,2,1],[],[]]},{"colors":4,"threeStar":15,"twoStar":19,"tubes":[[4,1,3,2],[1,4,2,2],[3,1,4,3],[1,4,2,3],[],[]]},{"colors":4,"threeStar":15,"twoStar":19,"tubes":[[2,3,4,2],[1,1,4,2],[3,2,1,4],[4,3,1,3],[],[]]},{"colors":4,"threeStar":15,"twoStar":19,"tubes":[[1,1,4,3],[2,1,3,2],[4,3,2,4],[1,2,3,4],[],[]]},{"colors":5,"threeStar":16,"twoStar":20,"tubes":[[3,2,5,3],[4,1,1,4],[3,5,2,4],[5,1,4,1],[2,2,3,5],[],[]]},{"colors":5,"threeStar":18,"twoStar":22,"tubes":[[1,4,2,1],[2,1,5,3],[4,3,5,5],[5,2,4,3],[4,1,3,2],[],[]]}];
+const finalReward=50;
+function config(n){return Number.isInteger(n)&&n>=1&&n<=levels.length?levels[n-1]:null;}
+function board(n){const c=config(n);if(!c)throw Error('Unknown Color Sort level');return c.tubes.map(t=>t.slice());}
+function stars(n,meta,won){const c=config(n);if(!won||!c||!meta||!Number.isInteger(meta.moves)||meta.moves<1||meta.sorted!==c.colors)return 0;return meta.moves<=c.threeStar?3:meta.moves<=c.twoStar?2:1;}
+function state(s){const old=s.sortCampaign&&typeof s.sortCampaign==='object'?s.sortCampaign:{};return {stars:Array.from({length:10},(_,i)=>{const v=old.stars?.[i];return Number.isInteger(v)&&v>=0&&v<=3?v:0;}),bonusClaimed:old.bonusClaimed===true};}
+function snapshot(s){const p=state(s);let unlocked=1;while(unlocked<10&&p.stars[unlocked-1]>0)unlocked++;return {...p,unlocked,completed:p.stars.filter(n=>n>0).length,totalStars:p.stars.reduce((a,b)=>a+b,0)};}
+function record(s,meta,won){if(!meta||!config(meta.level)||meta.level>snapshot(s).unlocked)return 0;const count=stars(meta.level,meta,won);if(!count)return 0;const p=state(s);p.stars[meta.level-1]=Math.max(p.stars[meta.level-1],count);let bonus=0;if(p.stars.every(n=>n>0)&&!p.bonusClaimed){bonus=finalReward;p.bonusClaimed=true;s.coins+=bonus;}s.sortCampaign=p;return bonus;}
+const api={levels,finalReward,config,board,stars,snapshot,record};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.PawtopiaSortCampaign=api;
+})(typeof window!=='undefined'?window:globalThis);
