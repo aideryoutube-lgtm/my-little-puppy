@@ -2,6 +2,8 @@
 
 This release implements the agreed gameplay, decoration, room-feedback and mobile-comfort package on `feature/pawtopia-3-1-rooms`. It preserves existing coin/XP amounts, Daily Rewards and collection payouts. New long-term and weekly goals award badges only, with no new currency. No Jerry media, models, animations or background image files change.
 
+Final edge QA also corrected floating-point clamping at fractional decoration sizes: minimum and maximum bounds are normalized and candidate points are reclamped after rounding, preventing an attempted left-edge placement from jumping to the opposite edge.
+
 ## Plan and implementation
 
 | # | Improvement | Delivered behavior | Evidence |
@@ -14,7 +16,7 @@ This release implements the agreed gameplay, decoration, room-feedback and mobil
 | 6 | Favorite decorations | Per-item stars save in preferences; Favorites intersects query, stock and theme. | Favorites persistence/failure tests |
 | 7 | Decoration sorting | Recommended, name, ascending price and available-copy count. Saved choice survives reload. | Sort order and rollback tests |
 | 8 | Preview before buying | Try in room closes Shop and displays a movable preview even for an unowned or Day 7 item. Nothing is purchased; Back to Shop returns to the item. | Preview in all five rooms; exact save comparisons |
-| 9 | Resize decorations | Selected Edit Decor items have −/+ size controls, from 65% to 150%. Relative scaled bounds avoid scene edges and care buttons; Confirm/Cancel retain normal semantics. | All items/rooms/edges at four scales; UI obstacle/resize tests |
+| 9 | Resize decorations | Selected Edit Decor items have −/+ size controls, from 65% to 150%. Relative scaled bounds avoid scene edges and care buttons; Confirm/Cancel retain normal semantics. | All items/rooms/edges at four scales plus every 5% scale step and an imported fractional size; UI obstacle/resize tests |
 | 10 | Undo last decor change | Only in Edit Decor, Undo asks confirmation before undoing the last placement, move, resize, removal or transfer. It restores the exact instance without refund or repurchase, is single-use and checks stale state. | Core and UI undo/retry/reload tests |
 | 11 | Room object reactions | Transparent, labelled touch areas offer short pillow/cushion, toy, curtain or leaf feedback; no pet action, save write or resource change. | Pointer-scroll suppression, no-Jerry/no-save and modal cleanup checks; artwork alignment remains manual |
 | 12 | Light/water feedback | Existing fixture controls add a finite visual pulse after toggle while retaining existing on/off glow, streams and ARIA state. | Fixture pulse/resize/backup-dialog cleanup checks |
@@ -25,7 +27,7 @@ This release implements the agreed gameplay, decoration, room-feedback and mobil
 | 17 | Back navigation | Album, Weekly and Records return to Today; preview returns to Shop; room lists keep their existing Back routes. Focus traps include input/select/native room summaries. | UI routes and keyboard regression tests |
 | 18 | Failed-save warning | A visible alert reports failed primary writes. Retry saves current visible state; if a game result awaits saving, it delegates to that round's safe Retry Save. | Failed preference/game/undo saves, primary-write rollback and successful retry |
 | 19 | Optional backup suggestions | Suggest a new JSON backup after 5 new completed levels, 3 new decor copies or 20 rounds since the last prepared backup. Later snoozes this session; Settings can disable suggestions. | Threshold, settings, snooze and download-preparation acknowledgement tests |
-| 20 | Mobile and regression checks | Automated pointer, bounds, orientation-interruption, 320px/390px layout structure, persistence, game and Baby/Puppy/Adult routes pass. Actual Safari gestures, native audio and visual alignment remain a device check. | 184 automated tests; attempted Chromium launch blocked by `socket() failed: Operation not permitted` |
+| 20 | Mobile and regression checks | Automated pointer, bounds, orientation-interruption, 320px/390px layout structure, persistence, game and Baby/Puppy/Adult routes pass. Actual Safari gestures, native audio and visual alignment remain a device check. | 185 automated tests; attempted Chromium launch blocked by `socket() failed: Operation not permitted` |
 
 ## Saved data and recovery
 
@@ -37,6 +39,6 @@ A prepared download is the browser's download handoff, not proof the user retain
 
 ## Validation and remaining manual checks
 
-`npm test`: **184 passed, 0 failed**. Syntax checks passed for all 35 modified/new JavaScript and CJS files. The full suite retains the prior 200 decoration-transfer scenarios, campaign solutions, atomic reward retries, backup recovery, inventory/room rules and Baby/Puppy/Adult action-media regression checks. Tests load the actual persistence helper when isolating the real game finish function, preserving failure injection rather than bypassing storage.
+`npm test`: **185 passed, 0 failed**. Syntax checks passed for all 35 modified/new JavaScript and CJS files. The full suite retains the prior 200 decoration-transfer scenarios, campaign solutions, atomic reward retries, backup recovery, inventory/room rules and Baby/Puppy/Adult action-media regression checks. Tests load the actual persistence helper when isolating the real game finish function, preserving failure injection rather than bypassing storage.
 
 A local Playwright Chromium launch was attempted and failed before page creation because this runtime prohibits socket creation. This is not a visual browser pass. The private Preview also retains its existing HTTP password challenge. Before treating device QA as complete, check on iPhone Safari: native audio unlock/volume, exact object-touch alignment on each unchanged room artwork, keyboard and disclosure navigation, physical drag/resize/cancel, rotation, no horizontal overflow and file download retention. Render Live and the protected HTTP response confirm deployment/service availability, not those device behaviors.
