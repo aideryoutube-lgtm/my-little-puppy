@@ -42,3 +42,15 @@ A prepared download is the browser's download handoff, not proof the user retain
 `npm test`: **185 passed, 0 failed**. Syntax checks passed for all 35 modified/new JavaScript and CJS files. The full suite retains the prior 200 decoration-transfer scenarios, campaign solutions, atomic reward retries, backup recovery, inventory/room rules and Baby/Puppy/Adult action-media regression checks. Tests load the actual persistence helper when isolating the real game finish function, preserving failure injection rather than bypassing storage.
 
 A local Playwright Chromium launch was attempted and failed before page creation because this runtime prohibits socket creation. This is not a visual browser pass. The private Preview also retains its existing HTTP password challenge. Before treating device QA as complete, check on iPhone Safari: native audio unlock/volume, exact object-touch alignment on each unchanged room artwork, keyboard and disclosure navigation, physical drag/resize/cancel, rotation, no horizontal overflow and file download retention. Render Live and the protected HTTP response confirm deployment/service availability, not those device behaviors.
+
+## Resume audit — 2026-11-15
+
+GitHub branch HEAD and Render Live were both `74d6b47863325f1428265bc464e123ff7567c9a3` before this audit. All twenty rows above have implementation and automated coverage; row 20 still requires real iPhone Safari QA. No gameplay repair was necessary.
+
+The advertised `npm test` command included obsolete animation assertions requiring the removed one-second idle videos and schema version 3. These now assert disabled idle, first-click actions and schema version 4. The optional full-browser smoke check is retained under `npm run test:browser` (requires Playwright and Chromium), outside the self-contained default suite. A new fresh-app test reloads the actual primary save and compares Coins, XP, decoration inventory/coordinates/size and earned achievements, then opens the album.
+
+Repeated full `npm test`: **247 passed, 0 failed, 0 skipped**. Changed CJS syntax and `git diff --check` pass. The separate browser smoke attempt with `/usr/bin/chromium` failed before page creation: `socket() failed: Operation not permitted`. This is an environment limitation, not a browser pass. Protected Preview returned HTTP 401 as expected without credentials.
+
+Place here is covered across all five rooms: it closes Shop/Inventory, retains the origin room, creates only a movable draft, ignores an unmoved tap, requires drag plus Confirm, and preserves the original inventory on Cancel. Confirmed coordinates survive a fresh app load.
+
+Remaining iPhone Safari checks: physical drag/resize/Confirm/Cancel and room transfers; portrait/landscape layout and object hit alignment; native video/first-tap playback; opt-in audio and independent room volume; restore/download through Files; reload and reopening Safari with real device storage; keyboard/focus/disclosure navigation.

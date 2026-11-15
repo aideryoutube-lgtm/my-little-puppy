@@ -3,7 +3,10 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.cjs test-*.cjs",
-    "test:decor": "node --test tests/decor-instances.cjs tests/decor-editor.cjs"
+    "test:decor": "node --test tests/decor-instances.cjs tests/decor-editor.cjs",
+    "test:browser": "node tests/support/bone-catch.browser.cjs"
   },
-  "devDependencies": { "jsdom": "26.1.0" }
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
 }
