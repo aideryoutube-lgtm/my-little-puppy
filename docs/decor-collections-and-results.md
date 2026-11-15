@@ -25,7 +25,7 @@ not celebrate. Leaving results clears timers. Reduced-motion preferences show
 static final values; changing that preference or hiding the page settles active
 effects immediately. Effects cannot intercept buttons or award additional coins.
 
-`npm test`: **162 passing tests**, including collection ownership in every room,
+`npm test`: **168 passing tests**, including collection ownership in every room,
 one-time claims, save failure/retry, Day 7 exclusivity, backup flags, count-up,
 reduced motion, backgrounding and actual saved-round integration. Actual iPhone
 Safari visual/touch verification remains manual.

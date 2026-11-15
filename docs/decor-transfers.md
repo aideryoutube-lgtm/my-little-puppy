@@ -1,0 +1,15 @@
+# Move a specific decoration to another room
+
+Inventory → Decor → Rooms & Decor (also available from Shop → Decor) now offers Move to room for each installed copy. The room picker identifies the item, copy and source room and shows all five room choices. The source room is disabled. Opening the picker and going Back are read-only, preserve the list's Shop/Inventory context and filters, and return focus to the chosen copy.
+
+Selecting a destination saves a normal room navigation, closes the dialog, and starts a transfer draft for that exact instance. Existing room-visit tracking remains unchanged. The source placement is still the canonical saved placement until the user independently moves the draft and presses Confirm. Clicking the initial draft does not open Confirm. Movement uses the existing touch/pointer and keyboard editor, bounds, care-button exclusions, and confirmation UI.
+
+Confirm calls the existing atomic decorTransfer operation: only the selected instance's room and relative coordinates change. The instance ID, purchased quantities, other placements and available inventory count remain the same, even when identical free copies exist. There are no transfer fees, refunds, XP or new reward grants. Confirmed edit handles are locked again; Edit Decor is required for later movement or removal.
+
+Cancel placement before movement, Cancel after dropping, a cancelled pointer gesture, backgrounding or restoring a backup discards the unsaved draft. The decoration stays in its original room at its original coordinates. The player may remain viewing the destination room; cancellation does not move the saved item there. A reload before confirmation likewise retains the original saved placement.
+
+If saving the destination-room navigation fails, the picker remains open and the source placement is untouched. If saving Confirm fails, the confirmation dialog keeps the draft, reports the error and allows retry or cancellation. Restoring a backup clears stale picker selections and drafts. Unknown instances and same-room transfers cannot fall back to a different copy. If no suitable initial space is available, the picker reopens with an explanation, leaving the original item intact.
+
+Implementation reuses beginPlace through an explicit-instance beginTransfer entry point and the existing transfer rules; ordinary Place here still prioritizes available inventory copies exactly as before. No new save fields, schema versions, asset changes or services are introduced.
+
+Validation: all 168 automated tests pass. New tests exercise all 10 decorations across all 20 directed room pairs (200 transfer scenarios), independent touch drag/Confirm, exact-instance selection with duplicate and free copies, read-only picker/Back/focus, all cancellation paths, failed navigation and confirmation saves with retry, stale selections, restore cleanup and a fresh app reload. Existing editor, inventory, games, rewards, Baby/Puppy/Adult and backup regression checks remain enabled. Real iPhone Safari layout, touch gestures and orientation remain manual checks in the authenticated private Preview.

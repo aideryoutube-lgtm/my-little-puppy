@@ -25,7 +25,7 @@ filters. Restoring a backup clears stale transient filters and uses the restored
 favorites and last-played game. Continue still targets the last played game,
 independently of the current view filters.
 
-`npm test`: **162 passing tests**, including category coverage, aliases,
+`npm test`: **168 passing tests**, including category coverage, aliases,
 combined filters, empty results, keyboard behavior, gameplay return, backup
 restore, and checks that filtering does not write progress or start a game.
 Visual layout and actual iPhone Safari keyboard/touch behavior remain manual
