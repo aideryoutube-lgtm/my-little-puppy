@@ -25,7 +25,7 @@ retains its existing progress keys. `savedAt` records a successful write;
 Catch best value cannot override its restored record. Export includes the old
 legacy best when exporting a save that has not already been restored.
 
-`npm test`: **168 passing tests**, covering all previous gameplay, decor and
+`npm test`: **184 passing tests**, covering all previous gameplay, decor and
 reward checks plus Continue, favorites, JSON export, real File/FileReader input,
 preview/Cancel/Confirm, recovery, storage failures and legacy migration.
 Actual iPhone Safari download UI, visual layout and physical touch still require
