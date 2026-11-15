@@ -41,7 +41,7 @@ decorations, XP, gifts and backup keys are preserved.
 
 ## Verification
 
-`npm test` passes **128 automated tests**. Tests include all 160 authored/configured
+`npm test` passes **135 automated tests**. Tests include all 160 authored/configured
 levels, gameplay-driven wins for the 120 new rounds, all sixteen maps, DOM input
 handlers and animation frames for levels 1 and 10 of each new trail, Next, pause,
 reload, save failure/retry, independent progression and one-time bonuses.
