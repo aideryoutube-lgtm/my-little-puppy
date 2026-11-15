@@ -22,6 +22,6 @@ A nonblocking card outside the room image introduces games, Shop, Place here/Edi
 
 ## Verification
 
-`npm test`: 156 automated tests. New checks cover all six items in every room, touch placement without early confirmation, locked handles after confirming, reactions, return to Inventory, free reinstall, saved coordinates and backup round trips; tour navigation, dismissal, replay and failed saves; opt-in audio, mute, modal/background cleanup, unsupported audio and asynchronous resume races. The previous mini-game, Baby/Puppy/Adult and reward regression checks remain enabled.
+`npm test`: 162 automated tests. New checks cover all six items in every room, touch placement without early confirmation, locked handles after confirming, reactions, return to Inventory, free reinstall, saved coordinates and backup round trips; tour navigation, dismissal, replay and failed saves; opt-in audio, mute, modal/background cleanup, unsupported audio and asynchronous resume races. The previous mini-game, Baby/Puppy/Adult and reward regression checks remain enabled.
 
 These are automated model and DOM/event tests. Actual iPhone Safari audio, physical gestures, orientation changes and visual layout still require a manual device check in the authenticated private Preview. Headless Chromium is unavailable in this execution environment because socket creation is restricted. Render Live and the HTTP password challenge verify deployment/service availability, not a visual browser check.
