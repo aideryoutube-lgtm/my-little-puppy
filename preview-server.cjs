@@ -10,6 +10,7 @@ const password=process.env.PREVIEW_PASSWORD;
 if(!username||!password||password.length<12){console.error('PREVIEW_USER and PREVIEW_PASSWORD (12+ chars) are required');process.exit(1);}
 const types={'.glb':'model/gltf-binary','.txt':'text/plain; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.mp4':'video/mp4','.mov':'video/quicktime','.json':'application/json','.ico':'image/x-icon','.woff2':'font/woff2','.mp3':'audio/mpeg'};
 function safeEqual(a,b){const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);}
+function sendFile(target,res,options){const stream=fs.createReadStream(target,options);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);}
 http.createServer((req,res)=>{
  const challenge=()=>{res.writeHead(401,{'WWW-Authenticate':'Basic realm="Pawtopia 3.1 Preview", charset="UTF-8"','Cache-Control':'no-store'});res.end('Authentication required');};
  let token='';
@@ -32,14 +33,14 @@ http.createServer((req,res)=>{
    const match=/^bytes=(\d*)-(\d*)$/.exec(range);
    let start=match[1]?Number(match[1]):0,end=match[2]?Number(match[2]):st.size-1;
    if(!match[1]){const suffix=Number(match[2]);start=Math.max(0,st.size-suffix);end=st.size-1;}
-   if(start>=st.size||end<start){res.writeHead(416,{'Content-Range':'bytes */'+st.size});return res.end();}
+   if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||(!match[1]&&Number(match[2])===0)||start>=st.size||end<start){res.writeHead(416,{'Content-Range':'bytes */'+st.size});return res.end();}
    end=Math.min(end,st.size-1);
    res.writeHead(206,{...headers,'Accept-Ranges':'bytes','Content-Range':`bytes ${start}-${end}/${st.size}`,'Content-Length':end-start+1});
    if(req.method==='HEAD')return res.end();
-   return fs.createReadStream(target,{start,end}).pipe(res);
+   return sendFile(target,res,{start,end});
   }
   res.writeHead(200,{...headers,'Accept-Ranges':'bytes','Content-Length':st.size});
   if(req.method==='HEAD')return res.end();
-  fs.createReadStream(target).pipe(res);
+  sendFile(target,res);
  });
 }).listen(Number(process.env.PORT)||10000,'0.0.0.0',()=>console.log('Pawtopia private preview listening'));

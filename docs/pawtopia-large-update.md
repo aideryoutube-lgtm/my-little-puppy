@@ -54,3 +54,7 @@ Repeated full `npm test`: **247 passed, 0 failed, 0 skipped**. Changed CJS synta
 Place here is covered across all five rooms: it closes Shop/Inventory, retains the origin room, creates only a movable draft, ignores an unmoved tap, requires drag plus Confirm, and preserves the original inventory on Cancel. Confirmed coordinates survive a fresh app load.
 
 Remaining iPhone Safari checks: physical drag/resize/Confirm/Cancel and room transfers; portrait/landscape layout and object hit alignment; native video/first-tap playback; opt-in audio and independent room volume; restore/download through Files; reload and reopening Safari with real device storage; keyboard/focus/disclosure navigation.
+
+## Preview media-server reliability
+
+Reject zero-length suffix ranges and unsafe integer offsets with HTTP 416. Handle file-stream errors without terminating the Preview process and release file streams when clients disconnect. Password authentication, HEAD, valid suffix/open-ended/clamped byte ranges retain their behavior. Added three server tests with mocked HTTP/filesystem boundaries; no real browser or codec pass is implied. Full `npm test`: 250 passed, zero failures/skips.
