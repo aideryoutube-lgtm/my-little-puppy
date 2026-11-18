@@ -19,9 +19,10 @@ const clothing = {
   'Yellow Raincoat': { slot: 'outfit', id: 'baby-yellow-coat' },
   'Red Cap': { slot: 'hat', id: 'baby-red-cap' }
 };
-const careButtons = ['food', 'sleep', 'bath', 'ball', 'dress'];
+const careButtons = ['food', 'sleep', 'bath', 'ball', 'dress', 'home'];
 
 function lockCare(locked) {
+  scene.toggleAttribute('data-care-busy', locked);
   for (const id of careButtons) {
     const button = document.getElementById(id);
     if (button) button.disabled = locked;
@@ -49,6 +50,10 @@ const careActions = {
   care: { room: 'bathroom', route: [.40, .86, .53, .79],
     clips: ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome'] },
   feed: { room: 'kitchen', route: [.35, .91, .61, .77], clips: ['WalkToBowl', 'Eat', 'WalkHome'] },
+  house: { room: 'garden', route: [.19, .66, .64, .78],
+    clips: ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'] },
+  drink: { room: 'kitchen', route: [.44, .95, .71, .82],
+    clips: ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'] },
   sleep: { room: 'bedroom', route: [.38, .81, .52, .74],
     clips: ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome'] },
   play: { room: 'garden', route: [.42, .98, .59, .81],
@@ -133,13 +138,21 @@ function cancelCare() {
 
 function startCare() {
   if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') return;
-  const action = careActions[pendingAction];
+  const request = pendingAction;
+  const action = careActions[request];
   pendingAction = undefined;
-  if (motionReduced() || roomBlocked() ||
-      !action.clips.every(name => viewer.availableAnimations?.includes(name))) return;
+  if ((request === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) ||
+      motionReduced() || roomBlocked() ||
+      !action.clips.every(name => viewer.availableAnimations?.includes(name))) {
+    cancelCare();
+    return;
+  }
   const origin = currentRoom;
   if (origin !== 'room-' + action.room) {
-    if (!origin || !window.pawtopiaWorld?.commit('room', action.room).ok) return;
+    if (!origin || !window.pawtopiaWorld?.commit('room', action.room).ok) {
+      cancelCare();
+      return;
+    }
     returnRoom = origin.slice('room-'.length);
   }
   if (!clearCareRoute(action.route)) {
@@ -188,7 +201,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=5',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=6',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -248,12 +261,15 @@ function sync() {
 scene.addEventListener('pawtopia-jerry-action', event => {
   const { action } = event.detail;
   if (Object.hasOwn(careActions, action) && scene.dataset.growthStage === 'Baby') {
-    if (failed || sequence || motionReduced()) return;
+    if (failed || sequence || pendingAction || clip === 'DressTurn' || motionReduced()) return;
+    if (action === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) return;
+    if (action === 'drink' && currentRoom !== 'room-kitchen') return;
     pendingAction = action;
+    if (ready && !viewer.hidden) lockCare(true);
     startCare();
     return;
   }
-  if (action === 'dress-show' && ready && !viewer.hidden && !sequence && !roomBlocked() &&
+  if (action === 'dress-show' && ready && !viewer.hidden && !sequence && !pendingAction && clip !== 'DressTurn' && !roomBlocked() &&
       !motionReduced() && viewer.availableAnimations?.includes('DressTurn')) {
     clearTimeout(walkTimer);
     lockCare(true);
@@ -261,7 +277,7 @@ scene.addEventListener('pawtopia-jerry-action', event => {
     return;
   }
   if (action !== 'touch' || !ready || viewer.hidden || !clip ||
-      sequence || clip === 'Happy' || clip === 'DressTurn' || motionReduced()) return;
+      sequence || pendingAction || clip === 'Happy' || clip === 'DressTurn' || motionReduced()) return;
   clearTimeout(walkTimer);
   play('Happy');
 });

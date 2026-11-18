@@ -92,6 +92,8 @@ test('Animated Baby has a weighted skin, blink morph and all care clips', () => 
     'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome',
     'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome',
     'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'DressTurn',
+    'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome',
+    'WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome',
   ]);
   assert(gltf.animations[1].channels.some(channel =>
     channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
@@ -172,11 +174,31 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     ['Idle', 'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'Idle'],
     ['Idle', 'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome', 'Idle'],
     ['Idle', 'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome', 'Idle'],
+    ['Idle', 'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome', 'Idle'],
+    ['Idle', 'WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome', 'Idle'],
   ]) {
     const positions = sequence.map(name => samples(name, ground, 'translation'));
     for (let i = 1; i < positions.length; i++) {
       assert.deepEqual(positions[i - 1].at(-1), positions[i][0]);
     }
+  }
+  assert.notDeepEqual(samples('WalkToWater', ground, 'translation').at(-1), approach.at(-1));
+  for (const [animation, node, property] of [
+    ['RestInside', 'Torso', 'translation'],
+    ['Stretch', 'Neck', 'rotation'],
+    ['DrinkWater', 'Head', 'rotation'],
+    ['DrinkWater', 'Tongue', 'scale'],
+    ['DrinkWater', 'Water ripple 1', 'scale'],
+    ['LickLips', 'Head', 'rotation'],
+  ]) {
+    const keys = samples(animation, named[node], property);
+    assert(keys.some(key => key.some((value, axis) => value !== keys[0][axis])));
+  }
+  for (const name of ['Open doghouse', 'Doghouse pitched roof']) {
+    const node = named[name];
+    assert(gltf.scenes[0].nodes.includes(node));
+    const walls = samples('EnterHouse', node, 'translation');
+    assert(walls.every(key => key.every((value, axis) => value === walls[0][axis])));
   }
   assert(samples('Sleep', 0, 'weights').every(([weight]) => weight === 1));
   const breath = samples('Sleep', named.Torso, 'translation');
@@ -360,6 +382,105 @@ test('Dress equips starter clothes without spending coins and reloads both wardr
     } finally {
       restored.close();
     }
+  } finally {
+    app.close();
+  }
+});
+
+
+test('House requires ownership and Drink starts only in the kitchen; both lock care until Idle', async t => {
+  const { window } = new JSDOM(
+    '<div id="roomCanvas" class="room-kitchen"><div id="scene" data-growth-stage="Baby">' +
+    '<button id="home"></button><button id="food"></button></div></div>',
+    { runScripts: 'outside-only', pretendToBeVisual: true },
+  );
+  t.after(() => window.close());
+  const doc = window.document;
+  const canvas = doc.getElementById('roomCanvas');
+  const scene = doc.getElementById('scene');
+  const home = doc.getElementById('home');
+  const frames = [];
+  const house = ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'];
+  const drink = ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'];
+  let hasHome = false;
+  window.requestAnimationFrame = callback => frames.push(callback);
+  window.pawtopiaWorld = {
+    snapshot: () => ({ hasHome }),
+    commit(type, room) {
+      assert.equal(type, 'room');
+      canvas.className = 'room-' + room;
+      return { ok: true };
+    },
+  };
+  Object.assign(window.HTMLElement.prototype, {
+    availableAnimations: ['Idle', ...house, ...drink],
+    duration: 4,
+    dismissPoster() {},
+    play() {},
+    pause() {},
+  });
+  window.eval(run);
+  const viewer = doc.getElementById('jerryBaby3D');
+  const act = action => scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', {
+    detail: { action },
+  }));
+  viewer.dispatchEvent(new window.Event('load'));
+  await settle();
+  act('house');
+  assert.equal(viewer.animationName, 'Idle');
+  canvas.className = 'room-living';
+  await settle();
+  act('drink');
+  assert.equal(viewer.animationName, 'Idle');
+
+  hasHome = true;
+  for (const [action, room, origin, sequence] of [
+    ['house', 'garden', 'living', house],
+    ['drink', 'kitchen', 'kitchen', drink],
+  ]) {
+    canvas.className = 'room-' + origin;
+    await settle();
+    act(action);
+    await settle();
+    assert.equal(canvas.className, 'room-' + room);
+    for (const clip of sequence) {
+      assert.equal(viewer.animationName, clip);
+      assert(home.disabled && scene.hasAttribute('data-care-busy'));
+      for (const blocked of ['house', 'drink', 'feed', 'sleep', 'play', 'care', 'dress-show', 'touch']) {
+        act(blocked);
+      }
+      assert.equal(viewer.animationName, clip);
+      viewer.currentTime = 3.7;
+      frames.shift()();
+      await settle();
+    }
+    assert.equal(viewer.animationName, 'Idle');
+    assert.equal(canvas.className, 'room-' + origin);
+    assert(!home.disabled && !scene.hasAttribute('data-care-busy'));
+  }
+});
+
+test('House and kitchen Drink controls dispatch care and block repeat water rewards', () => {
+  const { mount } = require('./support/mini-harness.cjs');
+  const app = mount({ hunger: 50, xp: 0, world: { room: 'kitchen' } });
+  try {
+    app.w.eval(fs.readFileSync(path.join(root, 'world.js'), 'utf8'));
+    const scene = app.$('#scene');
+    const actions = [];
+    scene.classList.add('jerry-baby-3d-ready');
+    scene.addEventListener('pawtopia-jerry-action', event => {
+      actions.push(event.detail.action);
+      if (event.detail.action === 'drink') scene.setAttribute('data-care-busy', '');
+    });
+    app.click('#home');
+    assert.equal(app.save().hasHome, true);
+    assert(app.w.pawtopiaWorld.commit("room", "kitchen").ok);
+    const beforeDrink = app.save().hunger;
+    app.click('[data-kitchen-water]');
+    app.click('[data-bowl-water]');
+    app.click('[data-bowl-food]');
+    assert.equal(app.save().hunger, beforeDrink + 5);
+    assert.deepEqual(actions, ['house', 'drink']);
   } finally {
     app.close();
   }

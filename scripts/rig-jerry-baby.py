@@ -241,8 +241,8 @@ def happy(t):
 
 
 def add_tongue():
-    # A small muzzle attachment follows the existing Head bone. Only Eat
-    # animates it; zero scale hides it in every other clip and in the bind pose.
+    # A small muzzle attachment follows the existing Head bone. Zero scale
+    # hides it outside clips that animate the tongue.
     points, normals, triangles = [], [], []
     rings, sides = 8, 12
     for ring in range(rings + 1):
@@ -688,6 +688,186 @@ clip('BathShake', 1.70 + blend_hold, shake_bath)
 clip('BathWalkHome', 2 * turn_time + bath_travel + blend_hold,
      lambda t: route_walk(t, home=True, route_heading=bath_heading, distance=bath_distance))
 clip('DressTurn', 2.05 + blend_hold, dress_turn)
+
+
+# Both props are attached to the scene, independent of Jerry's skeleton.
+# The open doorway is modeled with solid jambs and a lintel so normal depth
+# testing hides Jerry behind the walls and roof as he crosses the threshold.
+def solid(points, faces):
+    vertices, normals = [], []
+    for a, b, c in faces:
+        normal = np.cross(np.subtract(points[b], points[a]), np.subtract(points[c], points[a]))
+        normal = normal / np.linalg.norm(normal)
+        vertices.extend([points[a], points[b], points[c]])
+        normals.extend([normal] * 3)
+    return vertices, normals, list(range(len(vertices)))
+
+
+def box(x, y, z, w, h, d):
+    points = [(x + a * w / 2, y + b * h / 2, z + c * d / 2)
+              for a, b, c in [(-1,-1,-1), (1,-1,-1), (1,1,-1), (-1,1,-1),
+                              (-1,-1,1), (1,-1,1), (1,1,1), (-1,1,1)]]
+    return solid(points, [(0,2,1), (0,3,2), (4,5,6), (4,6,7), (0,4,7), (0,7,3),
+                          (1,2,6), (1,6,5), (3,7,6), (3,6,2), (0,1,5), (0,5,4)])
+
+
+house_heading = math.radians(-120)
+house_approach = .42
+house_inside = 2.30
+house_entry_time = (house_inside - house_approach) * period / stride
+house_origin = [(house_approach + .85) * math.sin(house_heading), -.93,
+                (house_approach + .85) * math.cos(house_heading)]
+wood = prop_material('House honey wood', [.52, .24, .08, 1], .82)
+roof = prop_material('House red roof', [.52, .055, .032, 1], .72)
+house_walls = prop_node('Open doghouse', prop_mesh('Open doghouse', [
+    box(-.74, .92, 1.24, .14, 1.84, 2.55), box(.74, .92, 1.24, .14, 1.84, 2.55),
+    box(0, .92, 2.51, 1.62, 1.84, .12),
+    box(-.70, .88, 0, .22, 1.76, .14), box(.70, .88, 0, .22, 1.76, .14),
+    box(0, 1.78, 0, 1.62, .14, .14),
+], wood), None, True)
+roof_points = [(-.94, 1.83, -.17), (0, 2.35, -.17), (.94, 1.83, -.17),
+               (-.94, 1.83, 2.66), (0, 2.35, 2.66), (.94, 1.83, 2.66)]
+house_roof = prop_node('Doghouse pitched roof', prop_mesh('Doghouse pitched roof', [
+    solid(roof_points, [(0,3,1), (1,3,4), (1,4,2), (2,4,5), (0,1,2), (3,5,4)])
+], roof), None, True)
+
+
+def with_house(data, visible=1):
+    for node in (house_walls, house_roof):
+        data[node, 'translation'] = house_origin
+        data[node, 'rotation'] = quaternion(1, house_heading)
+        # Keep the door and walls fixed during traversal.
+        data[node, 'scale'] = [visible] * 3
+    return data
+
+
+def house_rest(t):
+    t = min(t, 2.7)
+    crouch = smooth(t / .8) * (1 - smooth((t - 1.9) / .8))
+    data = route_pose(house_inside, house_heading, house_heading)
+    drop = crouch * (.26 + .011 * math.sin(math.tau * t / 1.2))
+    offset(data, body, dy=-drop)
+    for upper, paw in legs:
+        offset(data, upper, dy=drop * .65)
+        offset(data, paw, dy=drop * .35)
+    data[head, 'rotation'] = quaternion(0, .22 * crouch)
+    data[0, 'weights'] = crouch
+    return with_house(data)
+
+
+def house_exit(t):
+    # Back straight through the doorway, leaving the turn for WalkHome.
+    progress = np.clip(t / house_entry_time, 0, 1)
+    data = route_pose(house_inside - (house_inside - house_approach) * progress,
+                      house_heading, house_heading)
+    effort = smooth(t / .10) * smooth((house_entry_time - t) / .12)
+    walk_steps(data, -t, period, stride, 0, False, effort)
+    return with_house(data)
+
+
+def house_stretch(t):
+    amount = math.sin(math.pi * min(t / 1.28, 1))**2
+    data = route_pose(house_approach, house_heading, house_heading)
+    offset(data, body, dy=-.12 * amount)
+    for upper, paw in legs:
+        offset(data, upper, dy=.08 * amount)
+        offset(data, paw, dy=.04 * amount)
+    for upper, paw in legs[:2]:
+        offset(data, upper, dy=.05 * amount, dz=.16 * amount)
+        offset(data, paw, dy=.07 * amount, dz=.12 * amount)
+    data[neck, 'rotation'] = quaternion(0, .36 * amount)
+    data[head, 'rotation'] = quaternion(0, -.19 * amount)
+    data[tail, 'rotation'] = quaternion(0, -.38 * amount)
+    return with_house(data)
+
+
+house_walk_time = house_approach * period / stride
+clip('WalkToHouse', turn_time + house_walk_time + blend_hold,
+     lambda t: with_house(route_walk(t, route_heading=house_heading, distance=house_approach)))
+clip('EnterHouse', turn_time + house_entry_time + blend_hold,
+     lambda t: with_house(route_walk(t, route_heading=house_heading, start=house_approach,
+                                     distance=house_inside - house_approach)))
+clip('RestInside', 2.7 + blend_hold, house_rest)
+clip('ExitHouse', house_entry_time + blend_hold, house_exit)
+clip('Stretch', 1.28 + blend_hold, house_stretch)
+clip('HouseWalkHome', 2 * turn_time + house_walk_time + blend_hold,
+     lambda t: with_house(route_walk(t, home=True, route_heading=house_heading,
+                                    distance=house_approach)))
+
+
+def annulus(inner, outer, low, high):
+    points = [(r * math.cos(math.tau * i / 24), y, r * math.sin(math.tau * i / 24))
+              for r, y in [(inner, high), (outer, high), (outer * .91, low), (inner * .90, low)]
+              for i in range(24)]
+    faces = []
+    for row in range(4):
+        for i in range(24):
+            a, b = row * 24 + i, row * 24 + (i + 1) % 24
+            c, d = (a + 24) % 96, (b + 24) % 96
+            faces.extend([(a, b, c), (b, d, c)])
+    return solid(points, faces)
+
+
+drink_heading = math.radians(150)
+drink_distance = 1.25
+water_position = np.array([(drink_distance + .58) * math.sin(drink_heading), -.93,
+                           (drink_distance + .58) * math.cos(drink_heading)])
+ceramic = prop_material('Water bowl blue ceramic', [.055, .28, .52, 1], .27)
+surface = prop_material('Drinking water', [.14, .61, .80, 1], .21)
+ripple_material = prop_material('Water ripple', [.55, .84, .94, .72], .33, 'BLEND')
+drink_bowl = prop_node('Blue water bowl', prop_mesh('Blue water bowl', [
+    annulus(.265, .32, 0, .20), ellipsoid((0, .025, 0), [.283, .025, .283])
+], ceramic), None, True)
+drink_surface = prop_node('Water surface', prop_mesh('Water surface', [
+    ellipsoid((0, .153, 0), [.263, .012, .263])
+], surface), None, True)
+ripple_mesh = prop_mesh('Water ripple', [annulus(.239, .26, -.001, .001)], ripple_material)
+ripples = [prop_node(f'Water ripple {i + 1}', ripple_mesh, None, True) for i in range(2)]
+
+
+def with_water(data, t=None):
+    for node in (drink_bowl, drink_surface):
+        data[node, 'translation'] = water_position
+        data[node, 'scale'] = [1, 1, 1]
+    for i, node in enumerate(ripples):
+        elapsed = t - .85 - i * .24 if t is not None else -1
+        phase = (elapsed % .48) / .48
+        strength = math.sin(math.pi * phase)**.5 if 0 <= elapsed <= 1.92 else 0
+        data[node, 'translation'] = water_position + [0, .170, 0]
+        data[node, 'scale'] = [(.23 + .70 * phase) * strength, strength,
+                               (.23 + .70 * phase) * strength]
+    return data
+
+
+def drink_water(t):
+    data = route_pose(drink_distance, drink_heading, drink_heading)
+    lower = smooth(t / .68) * (1 - smooth((t - 2.64) / .62))
+    lap = math.sin(math.pi * ((t - .73) % .24) / .24)**4 if .73 <= t <= 2.65 else 0
+    data[neck, 'rotation'] = quaternion(0, .74 * lower)
+    data[head, 'rotation'] = quaternion(0, .70 * lower + .08 * lap)
+    data[tongue, 'translation'] = [0, -.026, .49 + .11 * lap]
+    data[tongue, 'scale'] = [lap] * 3
+    data[tail, 'rotation'] = quaternion(1, .12 * lower * math.sin(math.tau * t))
+    return with_water(data, t)
+
+
+def lick_lips(t):
+    data = route_pose(drink_distance, drink_heading, drink_heading)
+    lick = math.sin(math.pi * min(t / .63, 1))**2
+    data[head, 'rotation'] = quaternion(0, -.15 * lick)
+    data[tongue, 'translation'] = [0, -.026 + .07 * lick, .49 + .072 * lick]
+    data[tongue, 'scale'] = [lick] * 3
+    data[0, 'weights'] = .75 * lick
+    return with_water(data)
+
+
+drink_walk_time = drink_distance * period / stride
+clip('WalkToWater', turn_time + drink_walk_time + blend_hold,
+     lambda t: with_water(route_walk(t, route_heading=drink_heading, distance=drink_distance)))
+clip('DrinkWater', 3.26 + blend_hold, drink_water)
+clip('LickLips', .63 + blend_hold, lick_lips)
+clip('DrinkWalkHome', 2 * turn_time + drink_walk_time + blend_hold,
+     lambda t: with_water(route_walk(t, home=True, route_heading=drink_heading, distance=drink_distance)))
 
 gltf['buffers'][0]['byteLength'] = len(binary)
 metadata = json.dumps(gltf, separators=(',', ':')).encode()
