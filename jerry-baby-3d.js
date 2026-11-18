@@ -246,12 +246,21 @@ function sync() {
     const enteringCareRoom = sequence && returnRoom && room === 'room-' + sequence.room;
     currentRoom = room;
     viewer.hidden = !show;
-    if (ready && clip && changed && !(show && enteringCareRoom)) {
-      cancelCare();
-      if (show) idle();
-      else {
+    if (ready && clip && changed) {
+      if (!show) {
+        cancelCare();
         clearTimeout(walkTimer);
         viewer.pause();
+      } else if (enteringCareRoom) {
+        // Keep the active sequence when its own room transition completes.
+      } else if (pendingAction) {
+        // A pending care action must survive switching to its destination room.
+        // Clearing it here caused Feed, Sleep, Bath, Play and House to do nothing.
+        clearTimeout(walkTimer);
+        play('Idle').then(() => startCare());
+      } else {
+        cancelCare();
+        idle();
       }
     }
   }
