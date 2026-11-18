@@ -22,8 +22,9 @@ main{padding-top:env(safe-area-inset-top,0px)}body{padding-left:env(safe-area-in
 .room-canvas > #scene .scene-actions{pointer-events:auto;width:clamp(44px,13vw,56px)}
 #scene #roomJerry{position:absolute;z-index:2;object-fit:contain;object-position:center bottom;pointer-events:none;width:42%;height:42%;left:calc(var(--jerry-center) - 21%);bottom:var(--jerry-floor);filter:drop-shadow(0 5px 5px #33251640)}
 #scene #roomJerry[hidden]{display:none}
-#scene #roomJerry[data-stage="Baby"]{transform:scale(.76);transform-origin:bottom center}
-#scene #roomJerry[data-stage="Puppy"]{transform:scale(.9);transform-origin:bottom center}
+/* Normalize visible sprite heights to 45% / 70% of Adult, allowing for transparent padding. */
+#scene #roomJerry[data-stage="Baby"]{transform:scale(.448);transform-origin:bottom center}
+#scene #roomJerry[data-stage="Puppy"]{transform:scale(.769);transform-origin:bottom center}
 #scene.video-ready #roomJerry{visibility:hidden}
 .room-canvas > #scene .sleep-video{left:calc(var(--jerry-center) - 28.5%)!important;top:auto!important;bottom:var(--jerry-floor)!important;width:57%!important;height:46%!important;object-fit:contain!important;object-position:center bottom!important;background:transparent!important}
 .room-canvas > #scene .growth,.room-canvas > #scene .status{pointer-events:none}
@@ -270,3 +271,18 @@ html[data-effects=minimal] .decor-reaction-motion svg,html[data-effects=minimal]
 html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBowlInteraction .bowl-effect,html[data-effects=minimal] #kitchenBowlInteraction .bowl-effect:after{animation:none!important}html[data-effects=minimal] .room-light-glow{transition:none!important}
 
 .care-guide{margin:10px 0;border:1px solid #e1d6c4;border-radius:16px;background:#fffaf0;color:#493828;overflow:hidden}.care-guide summary{padding:12px 14px;cursor:pointer;font-weight:700;min-height:44px}.care-guide>div{padding:0 12px 12px}.care-guide p{font-size:.92rem;line-height:1.5}.care-needs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.care-need{padding:10px;border:1px solid #e7dfcf;border-radius:12px;min-width:0;background:#fff}.care-priority{border-color:#b77928;background:#fff3d8}.care-need label{display:block;font-size:.85rem;font-weight:700;overflow-wrap:anywhere}.care-need meter{display:block;width:100%;height:18px;margin:7px 0}.care-need button{width:100%;min-height:44px;font-size:.8rem;white-space:normal}.care-need button:disabled{opacity:.7}.care-guide summary:focus-visible{outline:3px solid #91611d;outline-offset:-3px}
+
+/* At the fixed camera distance, the model silhouette is about 45% of Adult's visible height. */
+#scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
+#jerryBaby3D{
+ position:absolute;z-index:2;left:calc(var(--jerry-center) - 18.5%);width:37%;height:18.3%;
+ bottom:calc(var(--jerry-floor) - 3.6%);background:transparent;pointer-events:none;
+ --poster-color:transparent;visibility:hidden;transform-origin:50% 80.4%;
+}
+#jerryBaby3D[hidden]{display:none}
+#scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible}
+@media (prefers-reduced-motion:no-preference){
+ #scene.jerry-baby-3d-ready #jerryBaby3D{animation:jerry-baby-breathe 3.8s ease-in-out infinite alternate}
+}
+html[data-effects=minimal] #scene.jerry-baby-3d-ready #jerryBaby3D{animation:none}
+@keyframes jerry-baby-breathe{from{transform:scaleY(1)}to{transform:scaleY(1.018)}}
