@@ -290,9 +290,16 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 
 .room-garden:has(> #scene.jerry-baby-3d-ready){background-image:url("./assets/rooms/Garden-Baby.webp")}
 
-/* Baby kitchen artwork has an empty bowl. Only the kibble is animated. */
-.room-canvas.room-kitchen:has(> #scene.jerry-baby-3d-ready){background-image:url('./assets/rooms/Kitchen-Baby-closed.webp')}
-.room-canvas.room-kitchen.kitchen-fridge-is-open:has(> #scene.jerry-baby-3d-ready){background-image:url('./assets/rooms/Kitchen-Baby-open.webp')!important}
-#babyFoodBowl{display:none;position:absolute;z-index:1;pointer-events:none}
-.room-kitchen > #scene.jerry-baby-3d-ready #babyFoodBowl{display:block}
-#babyFoodBowl svg{display:block;width:100%;height:100%}
+/* Cover the painted bowl only when the 3D replacement is ready. */
+.room-canvas.room-kitchen:has(> #scene.jerry-baby-3d-ready.baby-food-bowl-ready){background-image:url('./assets/rooms/Kitchen-Baby-closed.webp')}
+.room-canvas.room-kitchen.kitchen-fridge-is-open:has(> #scene.jerry-baby-3d-ready.baby-food-bowl-ready){background-image:url('./assets/rooms/Kitchen-Baby-open.webp')!important}
+#babyFoodBowl{visibility:hidden;position:absolute;z-index:1;pointer-events:none;
+ transform:translate(-50%,-50%);--poster-color:transparent}
+.room-kitchen > #scene.jerry-baby-3d-ready.baby-food-bowl-ready #babyFoodBowl{visibility:visible}
+
+/* The patch matches pixels (780,1080)–(918,1202) in the 941 × 1672 artwork. */
+#babyFoodRug{display:none;position:absolute;z-index:0;pointer-events:none;
+ left:82.8905%;top:64.5933%;width:14.6652%;height:7.2967%;
+ background:url('./assets/rooms/Kitchen-Food-Rug-closed.webp') center/100% 100% no-repeat}
+.kitchen-fridge-is-open #babyFoodRug{background-image:url('./assets/rooms/Kitchen-Food-Rug-open.webp')}
+.room-kitchen > #scene.jerry-baby-3d-ready.baby-food-bowl-ready #babyFoodRug{display:block}

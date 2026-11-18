@@ -560,6 +560,19 @@ test('Real action buttons complete each care route from every permitted room', a
   const viewer = $('#jerryBaby3D');
   viewer.dispatchEvent(new w.Event('load'));
   await settle();
+  const foodBowl = $('#babyFoodBowl');
+  assert.equal(foodBowl.localName, 'model-viewer');
+  const materials = Array.from({ length: 8 }, (_, index) => ({
+    name: 'Kibble ' + (index + 1),
+    pbrMetallicRoughness: {
+      baseColorFactor: [.3, .1, .03, 1],
+      setBaseColorFactor(color) { this.baseColorFactor = color; }
+    }
+  }));
+  foodBowl.model = { materials };
+  foodBowl.dispatchEvent(new w.Event('load'));
+  const portions = () => materials.filter(m => m.pbrMetallicRoughness.baseColorFactor[3] === 1).length;
+  assert.equal(portions(), 0);
   const room = () => app.save().world.room;
   for (const origin of ['living', 'kitchen', 'bedroom', 'bathroom', 'garden']) {
     for (const [button, destination, clips] of actions) {
@@ -592,12 +605,16 @@ test('Real action buttons complete each care route from every permitted room', a
           await settle();
           assert.equal(played.at(-1), clip);
         }
-        if (isFeed && clip === 'WalkToBowl') assert.equal(bowlLevel(), 100);
+        if (isFeed && clip === 'WalkToBowl') {
+          assert.equal(bowlLevel(), 100);
+          assert.equal(portions(), 8);
+        }
         if (isFeed && clip === 'Eat') {
           for (const [time, level] of [[1.22, 75], [2.10, 50], [2.98, 25]]) {
             viewer.currentTime = time;
             frames.shift()();
             assert.equal(bowlLevel(), level);
+            assert.equal(portions(), level / 12.5);
             assert.equal(app.save().feedCount, saved.feedCount);
             assert.equal(app.save().hunger, saved.hunger);
           }
@@ -614,6 +631,7 @@ test('Real action buttons complete each care route from every permitted room', a
       assert.equal(room(), isFeed ? 'kitchen' : origin);
       if (isFeed) {
         assert.equal(bowlLevel(), 0);
+        assert.equal(portions(), 0);
         assert.equal(viewer.style.getPropertyValue('translate'), '');
         assert.equal(app.save().feedCount, saved.feedCount + 1);
         assert.equal(app.save().hunger, Math.min(100, saved.hunger + 35));

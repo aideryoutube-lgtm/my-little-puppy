@@ -13,45 +13,56 @@ let fur;
 let dryFur;
 let wetness = 0;
 let foodLayer;
-let pellets = [];
+let foodMaterials = [];
 let foodLevel = 0;
 
-// The closed-fridge artwork is 941 × 1672. Both the stage mark and the
-// food layer use pixels from the same crop around the rim of the blue bowl.
-const bowl = { x: 790, y: 1072, width: 110, height: 64, centerX: 847.6, centerY: 1111.5 };
+// The rim is anchored to an artwork pixel in the 941 × 1672 portrait kitchen.
+// Use the same anchor for the prop's camera target and Jerry's lowered muzzle.
+const bowl = { centerX: 847.6, centerY: 1111.5, width: 150, height: 136 };
 const feedTurn = .48;
 const feedWalk = 5 * .58; // Five planted-paw cycles in rig-jerry-baby.py.
 const biteStart = .66;
 const biteCycle = .88;
 
 function makeFoodLayer() {
-  foodLayer = document.createElement('div');
+  foodLayer = document.createElement('model-viewer');
   foodLayer.id = 'babyFoodBowl';
   foodLayer.setAttribute('aria-hidden', 'true');
+  for (const [name, value] of Object.entries({
+    src: 'assets/models/KitchenFoodBowl.glb',
+    loading: 'eager',
+    'interaction-prompt': 'none',
+    'disable-tap': '',
+    'camera-target': '0m 0.61m 0m',
+    'camera-orbit': '0deg 62deg 4.2m',
+    'min-camera-orbit': 'auto auto 4.2m',
+    'max-camera-orbit': 'auto auto 4.2m',
+    'field-of-view': '30deg',
+    'shadow-intensity': '.65',
+    exposure: '1.1'
+  })) foodLayer.setAttribute(name, value);
   Object.assign(foodLayer.style, {
-    left: (100 * bowl.x / 941) + '%',
-    top: (100 * bowl.y / 1672) + '%',
+    left: (100 * bowl.centerX / 941) + '%',
+    top: (100 * bowl.centerY / 1672) + '%',
     width: (100 * bowl.width / 941) + '%',
     height: (100 * bowl.height / 1672) + '%'
   });
-  const pieces = Array.from({ length: 32 }, (_, index) => {
-    const angle = index * 2.399963;
-    const radius = Math.sqrt((index + .5) / 32);
-    const x = 57.6 + 35 * radius * Math.cos(angle);
-    const y = 38 + 15 * radius * Math.sin(angle);
-    return { index, x, y, angle: (index * 131) % 180 };
+  foodLayer.addEventListener('load', () => {
+    foodMaterials = foodLayer.model.materials
+      .filter(material => /^Kibble [1-8]$/.test(material.name))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(material => material.pbrMetallicRoughness);
+    setFoodLevel(foodLevel);
+    scene.classList.add('baby-food-bowl-ready');
   });
-  const shapes = pieces.sort((a, b) => a.y - b.y).map(({ index, x, y, angle }) =>
-    `<ellipse data-piece="${index}" cx="${x}" cy="${y}" rx="${5 + index % 3}" ry="4"
-      transform="rotate(${angle} ${x} ${y})" fill="url(#babyKibbleColor)"/>`).join('');
-  foodLayer.innerHTML = `<svg viewBox="0 0 110 64" preserveAspectRatio="none">
-    <defs><radialGradient id="babyKibbleColor" cx="32%" cy="25%" r="78%">
-      <stop stop-color="#efb467"/><stop offset=".52" stop-color="#b76a2c"/>
-      <stop offset="1" stop-color="#62350e"/>
-    </radialGradient></defs>${shapes}</svg>`;
-  scene.prepend(foodLayer);
-  pellets = [...foodLayer.querySelectorAll('[data-piece]')]
-    .sort((a, b) => Number(a.dataset.piece) - Number(b.dataset.piece));
+  foodLayer.addEventListener('error', () => {
+    foodMaterials = [];
+    scene.classList.remove('baby-food-bowl-ready');
+  });
+  const rug = document.createElement('div');
+  rug.id = 'babyFoodRug';
+  rug.setAttribute('aria-hidden', 'true');
+  scene.prepend(rug, foodLayer);
   setFoodLevel(0);
 }
 
@@ -59,10 +70,11 @@ function setFoodLevel(level) {
   foodLevel = level;
   if (!foodLayer) return;
   foodLayer.dataset.foodLevel = String(Math.round(level * 100));
-  // Lose outer pieces first. Each piece fades during the bite that takes it.
-  for (const [index, piece] of pellets.entries()) {
-    const opacity = String(Math.max(0, Math.min(1, level * pellets.length - index)));
-    if (piece.style.opacity !== opacity) piece.style.opacity = opacity;
+  const portions = Math.ceil(level * foodMaterials.length);
+  for (const [index, material] of foodMaterials.entries()) {
+    const [r, g, b, alpha] = material.baseColorFactor;
+    const visible = Number(index < portions);
+    if (alpha !== visible) material.setBaseColorFactor([r, g, b, visible]);
   }
 }
 
