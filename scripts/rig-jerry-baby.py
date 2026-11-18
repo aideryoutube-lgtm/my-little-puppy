@@ -116,8 +116,13 @@ for center_x in (-.166, .166):
     patch = ((x - center_x) / .11)**2 + ((y - eye_y) / .105)**2
     influence = (1 - blend(patch, .31, 1.0)) * blend(z, .57, .73)
     eyelid[:, 1] += (eye_y - y) * .94 * influence
-primitive['targets'] = [dict(POSITION=add_accessor(eyelid, 'VEC3', bounds=True))]
-gltf['meshes'][0].update(weights=[0], extras={'targetNames': ['Blink']})
+# A local lower-muzzle morph keeps the upper muzzle and nose still as Jerry bites.
+jaw = np.zeros_like(vertices)
+jaw_region = ((x / .20)**2 + ((y - .055) / .105)**2)
+jaw[:, 1] = -.095 * (1 - blend(jaw_region, .35, 1)) * blend(z, .56, .76)
+primitive['targets'] = [dict(POSITION=add_accessor(target, 'VEC3', bounds=True))
+                        for target in (eyelid, jaw)]
+gltf['meshes'][0].update(weights=[0, 0], extras={'targetNames': ['Blink', 'Chew']})
 gltf['animations'] = []
 
 
@@ -134,7 +139,11 @@ def clip(name, duration, pose):
     samplers, channels = [], []
     for joint, prop in frames[0]:
         kind = {'rotation': 'VEC4', 'translation': 'VEC3', 'scale': 'VEC3', 'weights': 'SCALAR'}[prop]
-        output = add_accessor([frame[joint, prop] for frame in frames], kind)
+        values = [frame[joint, prop] for frame in frames]
+        if prop == 'weights':
+            values = [value if isinstance(value, tuple) else (value, 0) for value in values]
+            values = [weight for pair in values for weight in pair]
+        output = add_accessor(values, kind)
         channels.append(dict(sampler=len(samplers), target=dict(node=joint, path=prop)))
         samplers.append(dict(input=input_accessor, output=output, interpolation='LINEAR'))
     gltf['animations'].append(dict(name=name, channels=channels, samplers=samplers))
@@ -277,7 +286,7 @@ def add_tongue():
 bowl_heading = math.radians(120)
 stride = .255
 period = .58
-strides = 4
+strides = 5
 travel_time = strides * period
 reach = strides * stride
 turn_time = .48
@@ -334,15 +343,25 @@ def kitchen_walk(t, home=False):
 
 def eat(t):
     data = route_pose(reach, bowl_heading, bowl_heading)
-    lowering = smooth(t / .65) * (1 - smooth((t - 2.2) / .65))
-    chewing = lowering * (math.sin(math.tau * 2.7 * t) + 1) / 2
-    lick = max(0, math.sin(math.pi * np.clip((t - 2.77) / .40, 0, 1)))**2
-    wag = smooth((t - 2.95) / .25) * (1 - smooth((t - 3.6) / .25))
-    data[neck, 'rotation'] = quaternion(0, .48 * lowering + .08 * chewing)
-    data[head, 'rotation'] = quaternion(0, .35 * lowering + .13 * chewing - .23 * lick)
+    # First lower the muzzle, then make four sets of bites. Between sets
+    # lift briefly and lick before the next bite, ending with a full head lift.
+    bite_time = t - .66
+    within_bites = 0 <= bite_time < 3.52
+    phase = bite_time % .88
+    sip_break = ((smooth((phase - .57) / .11) *
+                  (1 - smooth((phase - .74) / .14))) if within_bites else 0)
+    lowering = smooth(t / .62) * (1 - smooth((t - 4.0) / .48)) * (1 - .44 * sip_break)
+    chewing = ((math.sin(math.tau * 3.6 * bite_time) + 1) / 2 *
+               smooth(phase / .07) * (1 - smooth((phase - .46) / .13))
+               if within_bites else 0)
+    final_lick = math.sin(math.pi * np.clip((t - 4.43) / .34, 0, 1))**2
+    lick = max(.70 * sip_break, final_lick)
+    wag = smooth((t - 4.43) / .17) * (1 - smooth((t - 4.97) / .18))
+    data[neck, 'rotation'] = quaternion(0, .49 * lowering + .035 * chewing)
+    data[head, 'rotation'] = quaternion(0, .37 * lowering + .08 * chewing - .19 * lick)
     data[tongue, 'scale'] = [lick] * 3
     data[tongue, 'translation'] = [0, -.025 + .045 * lick, .49 + .062 * lick]
-    data[0, 'weights'] = .9 * lick
+    data[0, 'weights'] = (.65 * lick, chewing)
     data[tail, 'rotation'] = quaternion(1, .58 * wag * math.sin(math.tau * 4.5 * t))
     return data
 
@@ -461,7 +480,7 @@ tongue = add_tongue()
 # the timeline loops, keeping the feet and root at the hand-off position.
 blend_hold = .55
 clip('WalkToBowl', turn_time + travel_time + blend_hold, kitchen_walk)
-clip('Eat', 3.85 + blend_hold, eat)
+clip('Eat', 5.16 + blend_hold, eat)
 clip('WalkHome', 2 * turn_time + travel_time + blend_hold,
      lambda t: kitchen_walk(min(t, 2 * turn_time + travel_time), home=True))
 ball = add_ball()

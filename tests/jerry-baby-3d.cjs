@@ -77,7 +77,7 @@ test('3D Baby follows room changes and keeps the still on renderer failure', asy
   assert.equal(shown(), false);
 });
 
-test('Animated Baby has a weighted skin, blink morph and all care clips', () => {
+test('Animated Baby has a weighted skin, blink and chew morphs and all care clips', () => {
   const file = fs.readFileSync(path.join(root, 'assets/models/Jerry_Baby_Animated.glb'));
   const gltf = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
   assert.equal(file.readUInt32LE(8), file.length);
@@ -87,7 +87,7 @@ test('Animated Baby has a weighted skin, blink morph and all care clips', () => 
     assert.equal(gltf.accessors[mesh.attributes[key]].count,
       gltf.accessors[mesh.attributes.POSITION].count);
   }
-  assert.equal(mesh.targets.length, 1);
+  assert.deepEqual(gltf.meshes[0].extras.targetNames, ['Blink', 'Chew']);
   assert.deepEqual(gltf.animations.map(clip => clip.name), [
     'Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome',
     'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome',
@@ -146,9 +146,9 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     assert(channel, clip + ' must animate ' + gltf.nodes[node].name + ' ' + channelPath);
     const accessor = gltf.accessors[animation.samplers[channel.sampler].output];
     const view = gltf.bufferViews[accessor.bufferView];
-    const width = { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type];
+    const width = channelPath === 'weights' ? 2 : { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type];
     const start = 28 + length + (view.byteOffset || 0) + (accessor.byteOffset || 0);
-    return Array.from({length: accessor.count}, (_, frame) =>
+    return Array.from({length: channelPath === 'weights' ? accessor.count / 2 : accessor.count}, (_, frame) =>
       Array.from({length: width}, (_, axis) => file.readFloatLE(start + (frame * width + axis) * 4)));
   }
   const approach = samples('WalkToBowl', ground, 'translation');
@@ -162,6 +162,8 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     const keys = samples('Eat', named[name], 'rotation');
     assert(keys.some(key => key.some((component, axis) => component !== keys[0][axis])));
   }
+  assert(samples('Eat', 0, 'weights').some(([, chew]) => chew > .75));
+  assert(samples('Idle', 0, 'weights').every(([, chew]) => chew === 0));
   assert(samples('Eat', named.Tongue, 'scale').some(key => key[0] > 0));
   assert(!gltf.skins[0].joints.includes(named.Tongue));
   for (const name of Object.keys(named).filter(name => name.endsWith('paw'))) {
@@ -204,7 +206,7 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   assert(samples('Sleep', 0, 'weights').every(([weight]) => weight === 1));
   const breath = samples('Sleep', named.Torso, 'translation');
   assert(breath.some(([, height]) => height > breath[0][1]));
-  assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0]);
+  assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0, 0]);
 
   for (const name of ['Bath water', 'Bath foam', 'Bath droplet 1']) {
     assert.deepEqual(gltf.nodes[named[name]].scale, [0, 0, 0]);
@@ -278,7 +280,7 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
     assert.equal(viewer.animationName, next);
   }
   assert.deepEqual(played, ['Idle', 'WalkToBowl', 'Eat', 'WalkHome', 'Idle'].map(name => [name, undefined]));
-  assert.deepEqual(visits, ['kitchen', 'garden']);
+  assert.deepEqual(visits, ['kitchen']);
   assert.equal(doc.querySelectorAll('#jerryBaby3D').length, 1);
   feed();
   await settle();
@@ -286,7 +288,7 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
   await settle();
   frames.shift()();
   assert.equal(viewer.animationName, 'Idle');
-  assert.deepEqual(visits, ['kitchen', 'garden', 'kitchen']);
+  assert.deepEqual(visits, ['kitchen']);
 });
 
 
@@ -510,7 +512,7 @@ test('Saving care progress cannot cancel the 3D action through an unchanged effe
   await settle();
   app.click('#food');
   await settle();
-  assert.equal(app.save().xp, 10);
+  assert.equal(app.save().xp, 0);
   assert.equal(app.save().world.room, 'kitchen');
   assert.equal(played.at(-1), 'WalkToBowl');
   w.PawtopiaExperienceUI.sync();
@@ -573,6 +575,8 @@ test('Real action buttons complete each care route from every permitted room', a
         assert.equal(app.save().world.equipped.outfit, outfit);
       }
       const saved = app.save();
+      const isFeed = button === '#food';
+      const bowlLevel = () => Number($('#babyFoodBowl').dataset.foodLevel);
       $(button)?.click(); // Immediately repeat the input while care is locked.
       assert.equal(app.save().feedCount, saved.feedCount);
       assert.equal(app.save().hunger, saved.hunger);
@@ -588,7 +592,18 @@ test('Real action buttons complete each care route from every permitted room', a
           await settle();
           assert.equal(played.at(-1), clip);
         }
-        viewer.currentTime = 0.5;
+        if (isFeed && clip === 'WalkToBowl') assert.equal(bowlLevel(), 100);
+        if (isFeed && clip === 'Eat') {
+          for (const [time, level] of [[1.22, 75], [2.10, 50], [2.98, 25]]) {
+            viewer.currentTime = time;
+            frames.shift()();
+            assert.equal(bowlLevel(), level);
+            assert.equal(app.save().feedCount, saved.feedCount);
+            assert.equal(app.save().hunger, saved.hunger);
+          }
+          // Finish the clip below without going backwards in the timeline.
+          viewer.currentTime = 3.45;
+        } else viewer.currentTime = 0.5;
         frames.shift()();
         assert.equal(played.at(-1), clip);
         viewer.currentTime = 3.7;
@@ -596,7 +611,13 @@ test('Real action buttons complete each care route from every permitted room', a
         await settle();
       }
       assert.deepEqual(played, [...clips, 'Idle']);
-      assert.equal(room(), origin);
+      assert.equal(room(), isFeed ? 'kitchen' : origin);
+      if (isFeed) {
+        assert.equal(bowlLevel(), 0);
+        assert.equal(viewer.style.getPropertyValue('translate'), '');
+        assert.equal(app.save().feedCount, saved.feedCount + 1);
+        assert.equal(app.save().hunger, Math.min(100, saved.hunger + 35));
+      }
       assert(!$('#food').disabled && !$('#scene').hasAttribute('data-care-busy'));
     }
   }

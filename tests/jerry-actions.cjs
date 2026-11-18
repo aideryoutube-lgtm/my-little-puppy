@@ -9,7 +9,7 @@ function game(xp=0){
  const elements={},timers=new Map(),logs=[];let seq=0;
  function element(id){return elements[id]??=(function(){const classes=new Set();return {id,hidden:['shopOverlay','miniOverlay'].includes(id),style:{backgroundImage:''},attrs:{},textContent:'',
  classList:{add(...xs){xs.forEach(x=>classes.add(x))},remove(...xs){xs.forEach(x=>classes.delete(x))},toggle(x,on){on?classes.add(x):classes.delete(x)},contains:x=>classes.has(x)},
- addEventListener(){},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},removeAttribute(k){delete this[k]},click(){this.onclick?.()},};})();}
+ addEventListener(){},hasAttribute(){return false;},setAttribute(k,v){this.attrs[k]=v},getAttribute(k){return this.attrs[k]},removeAttribute(k){delete this[k]},click(){this.onclick?.()},};})();}
  const saved=new Map([['jerry-save-v1',JSON.stringify({coins:100,xp})]]);
  const context={document:{getElementById:element,createElement:()=>element('preload'+seq++),addEventListener(){},hidden:false},window:{location:{search:''},PawtopiaWorldCore:require('../world-core.js')},localStorage:{getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)},Image:function(){},URLSearchParams,Date,Number,Math,JSON,confirm:()=>true,console:{warn:(...x)=>logs.push(x),error:(...x)=>logs.push(x)},setTimeout:(cb,ms)=>{timers.set(++seq,{cb,ms});return seq},clearTimeout:id=>timers.delete(id),setInterval:()=>0,clearInterval(){},requestAnimationFrame:cb=>{cb();return 1},cancelAnimationFrame(){}};
  vm.runInNewContext(html.match(/<script>([\s\S]*?)<\/script>/)[1],context);
