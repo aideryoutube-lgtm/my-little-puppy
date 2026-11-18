@@ -272,12 +272,17 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 
 .care-guide{margin:10px 0;border:1px solid #e1d6c4;border-radius:16px;background:#fffaf0;color:#493828;overflow:hidden}.care-guide summary{padding:12px 14px;cursor:pointer;font-weight:700;min-height:44px}.care-guide>div{padding:0 12px 12px}.care-guide p{font-size:.92rem;line-height:1.5}.care-needs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.care-need{padding:10px;border:1px solid #e7dfcf;border-radius:12px;min-width:0;background:#fff}.care-priority{border-color:#b77928;background:#fff3d8}.care-need label{display:block;font-size:.85rem;font-weight:700;overflow-wrap:anywhere}.care-need meter{display:block;width:100%;height:18px;margin:7px 0}.care-need button{width:100%;min-height:44px;font-size:.8rem;white-space:normal}.care-need button:disabled{opacity:.7}.care-guide summary:focus-visible{outline:3px solid #91611d;outline-offset:-3px}
 
-/* Scale the rendered Baby from its paw line so the room floor anchor stays fixed. */
+/* Baby-only anchors use coordinates on the floor of each room artwork. */
+.room-living{--baby-center:53%;--baby-floor:38%}
+.room-kitchen{--baby-center:50%;--baby-floor:26%;--baby-viewport:63%}
+.room-bedroom{--baby-center:55%;--baby-floor:32%}
+.room-bathroom{--baby-center:53%;--baby-floor:29%}
+.room-garden{--baby-center:76%;--baby-floor:24%}
 #scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
 #jerryBaby3D{
- position:absolute;z-index:2;left:calc(var(--jerry-center) - 18.5%);width:37%;height:18.3%;
- bottom:calc(var(--jerry-floor) - 3.6%);background:transparent;pointer-events:none;
- --poster-color:transparent;visibility:hidden;transform-origin:50% 80.4%;scale:1.25;
+ position:absolute;z-index:2;left:calc(var(--baby-center) - var(--baby-viewport, 37%) / 2);width:var(--baby-viewport, 37%);height:18.3%;
+ bottom:calc(var(--baby-floor) - 3.6%);background:transparent;pointer-events:none;
+ --poster-color:transparent;visibility:hidden;transform-origin:50% 80.4%;scale:1.875;
 }
 #jerryBaby3D[hidden]{display:none}
 #scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible}

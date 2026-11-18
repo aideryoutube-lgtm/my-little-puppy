@@ -133,7 +133,7 @@ def clip(name, duration, pose):
     input_accessor = add_accessor(times, 'SCALAR', bounds=True)
     samplers, channels = [], []
     for joint, prop in frames[0]:
-        kind = {'rotation': 'VEC4', 'translation': 'VEC3', 'weights': 'SCALAR'}[prop]
+        kind = {'rotation': 'VEC4', 'translation': 'VEC3', 'scale': 'VEC3', 'weights': 'SCALAR'}[prop]
         output = add_accessor([frame[joint, prop] for frame in frames], kind)
         channels.append(dict(sampler=len(samplers), target=dict(node=joint, path=prop)))
         samplers.append(dict(input=input_accessor, output=output, interpolation='LINEAR'))
@@ -204,10 +204,14 @@ def walk(t):
     offset(data, body, dy=bob)
     data[head, 'rotation'] = quaternion(2, .045 * math.sin(math.tau * t / period))
     data[tail, 'rotation'] = quaternion(1, .28 * math.sin(math.tau * t / period))
+    walk_steps(data, t, turn if turning else period, distance / 2, bob, turning)
+    return data
+
+
+def walk_steps(data, t, period, stride, bob, turning, effort=1):
     for (upper, paw), step in zip(legs, (.25, .75, 0, .5)):
-        p = (t / (turn if turning else period) + step) % 1
+        p = (t / period + step) % 1
         stance = .67
-        stride = distance / 2
         if p < stance:
             forward = stride * (stance / 2 - p)
             lift = 0
@@ -217,9 +221,10 @@ def walk(t):
             lift = .12 * math.sin(math.pi * swing)**2
         if turning:
             forward = 0
+        lift *= effort
+        forward *= effort
         offset(data, upper, dy=-bob + lift * .38, dz=forward * .35)
         offset(data, paw, dy=lift * .62, dz=forward * .65)
-    return data
 
 
 def happy(t):
@@ -235,9 +240,115 @@ def happy(t):
     return data
 
 
+def add_tongue():
+    # A small muzzle attachment follows the existing Head bone. Only Eat
+    # animates it; zero scale hides it in every other clip and in the bind pose.
+    points, normals, triangles = [], [], []
+    rings, sides = 8, 12
+    for ring in range(rings + 1):
+        angle = math.pi * ring / rings
+        for side in range(sides):
+            around = math.tau * side / sides
+            x = math.sin(angle) * math.cos(around)
+            y = math.sin(angle) * math.sin(around)
+            z = math.cos(angle)
+            points.append((x * .057, y * .019 + .028 * max(0, z)**2, z * .087))
+            normals.append((x, y, z))
+            if ring < rings:
+                a = ring * sides + side
+                b = ring * sides + (side + 1) % sides
+                triangles.extend((a, a + sides, b, b, a + sides, b + sides))
+    material = len(gltf['materials'])
+    gltf['materials'].append(dict(name='Tongue', doubleSided=True, pbrMetallicRoughness=dict(
+        baseColorFactor=[.73, .23, .29, 1], metallicFactor=0, roughnessFactor=.8)))
+    mesh = len(gltf['meshes'])
+    gltf['meshes'].append(dict(name='Tongue', primitives=[dict(
+        attributes=dict(POSITION=add_accessor(points, 'VEC3', bounds=True),
+                        NORMAL=add_accessor(normals, 'VEC3')),
+        indices=add_accessor(triangles, 'SCALAR', 5121), material=material)]))
+    node = len(nodes)
+    nodes.append(dict(name='Tongue', mesh=mesh, translation=[0, -.01, .49], scale=[0, 0, 0]))
+    nodes[head].setdefault('children', []).append(node)
+    return node
+
+
+# Camera azimuth is 30 degrees. A heading of 120 degrees moves screen-right
+# along the clear strip of kitchen floor immediately in front of the bowls.
+bowl_heading = math.radians(120)
+stride = .255
+period = .58
+strides = 4
+travel_time = strides * period
+reach = strides * stride
+turn_time = .48
+
+
+def kitchen_pose(distance, heading):
+    data = frame()
+    offset(data, root, dx=distance * math.sin(bowl_heading),
+           dz=distance * math.cos(bowl_heading))
+    data[root, 'rotation'] = quaternion(1, heading)
+    return data
+
+
+def kitchen_walk(t, home=False):
+    # Take little steps during turns, then match planted-paw speed to root
+    # motion during the straight section, using the existing Walk gait.
+    initial = bowl_heading if home else 0
+    heading = bowl_heading + math.pi if home else bowl_heading
+    direction = -1 if home else 1
+    start = reach if home else 0
+    if t < turn_time:
+        phase = t / turn_time
+        data = kitchen_pose(start, initial + (heading - initial) * smooth(phase))
+        effort = smooth(t / .09) * smooth((turn_time - t) / .09)
+        walk_steps(data, t, turn_time, stride, 0, True, effort)
+        return data
+    t -= turn_time
+    distance = start + direction * min(reach, t * stride / period)
+    if t > travel_time:
+        elapsed = t - travel_time
+        end_heading = math.tau if home else bowl_heading
+        data = kitchen_pose(distance, heading + (end_heading - heading) * smooth(elapsed / turn_time))
+        if home:
+            effort = smooth(elapsed / .09) * smooth((turn_time - elapsed) / .09)
+            walk_steps(data, elapsed, turn_time, stride, 0, True, effort)
+        return data
+    data = kitchen_pose(distance, heading)
+    effort = smooth(t / .09) * smooth((travel_time - t) / .09)
+    bob = .012 * effort * math.sin(math.tau * 2 * t / period)
+    offset(data, body, dy=bob)
+    walk_steps(data, t, period, stride, bob, False, effort)
+    data[tail, 'rotation'] = quaternion(1, .24 * effort * math.sin(math.tau * t / period))
+    return data
+
+
+def eat(t):
+    data = kitchen_pose(reach, bowl_heading)
+    lowering = smooth(t / .65) * (1 - smooth((t - 2.2) / .65))
+    chewing = lowering * (math.sin(math.tau * 2.7 * t) + 1) / 2
+    lick = max(0, math.sin(math.pi * np.clip((t - 2.77) / .40, 0, 1)))**2
+    wag = smooth((t - 2.95) / .25) * (1 - smooth((t - 3.6) / .25))
+    data[neck, 'rotation'] = quaternion(0, .48 * lowering + .08 * chewing)
+    data[head, 'rotation'] = quaternion(0, .35 * lowering + .13 * chewing - .23 * lick)
+    data[tongue, 'scale'] = [lick] * 3
+    data[tongue, 'translation'] = [0, -.025 + .045 * lick, .49 + .062 * lick]
+    data[0, 'weights'] = .9 * lick
+    data[tail, 'rotation'] = quaternion(1, .58 * wag * math.sin(math.tau * 4.5 * t))
+    return data
+
+
 clip('Idle', 6, idle)
 clip('Walk', 4.72, walk)
 clip('Happy', 1.5, happy)
+tongue = add_tongue()
+# The terminal pose holds long enough for the live mixer to crossfade before
+# the timeline loops, keeping the feet and root at the hand-off position.
+blend_hold = .55
+clip('WalkToBowl', turn_time + travel_time + blend_hold, kitchen_walk)
+clip('Eat', 3.85 + blend_hold, eat)
+clip('WalkHome', 2 * turn_time + travel_time + blend_hold,
+     lambda t: kitchen_walk(min(t, 2 * turn_time + travel_time), home=True))
 gltf['buffers'][0]['byteLength'] = len(binary)
 metadata = json.dumps(gltf, separators=(',', ':')).encode()
 metadata += b' ' * (-len(metadata) % 4)
