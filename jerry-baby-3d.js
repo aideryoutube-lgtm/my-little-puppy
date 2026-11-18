@@ -140,7 +140,6 @@ function startCare() {
   if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') return;
   const request = pendingAction;
   const action = careActions[request];
-  pendingAction = undefined;
   if ((request === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) ||
       motionReduced() || roomBlocked() ||
       !action.clips.every(name => viewer.availableAnimations?.includes(name))) {
@@ -153,13 +152,18 @@ function startCare() {
       cancelCare();
       return;
     }
+    // Keep pendingAction until the destination room has mounted.
+    // Previously it was cleared before commit(), so the room observer
+    // cancelled the action without ever playing the first clip.
     returnRoom = origin.slice('room-'.length);
+    return;
   }
   if (!clearCareRoute(action.route)) {
     if (returnRoom) window.pawtopiaWorld.commit('room', returnRoom);
     cancelCare();
     return;
   }
+  pendingAction = undefined;
   clearTimeout(walkTimer);
   sequence = action;
   lockCare(true);
