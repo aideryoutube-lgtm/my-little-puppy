@@ -6,6 +6,7 @@
   box.setAttribute('role', 'status');
   box.style.cssText = 'margin:8px 5px;padding:8px 10px;background:#fff8db;border:1px solid #d9ad59;border-radius:10px;font:12px/1.45 system-ui;color:#63300e;overflow-wrap:anywhere';
   const entries = [];
+  window.addEventListener('baby-care-debug', event => record('care: ' + event.detail));
   const record = (message) => {
     const value = String(message).slice(0,180);
     if (entries.at(-1) !== value) entries.push(value);
