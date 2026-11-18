@@ -276,7 +276,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-living{--baby-center:53%;--baby-floor:38%}
 .room-kitchen{--baby-center:50%;--baby-floor:26%;--baby-viewport:63%}
 .room-bedroom{--baby-center:55%;--baby-floor:32%}
-.room-bathroom{--baby-center:53%;--baby-floor:29%}
+.room-bathroom{--baby-center:53%;--baby-floor:29%;--baby-viewport:65%}
 .room-garden{--baby-center:60%;--baby-floor:24%;--baby-viewport:70%}
 #scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
 #jerryBaby3D{

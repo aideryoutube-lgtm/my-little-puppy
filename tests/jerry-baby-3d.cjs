@@ -91,6 +91,7 @@ test('Animated Baby has a weighted skin, blink morph and all care clips', () => 
     'Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome',
     'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome',
     'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome',
+    'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'DressTurn',
   ]);
   assert(gltf.animations[1].channels.some(channel =>
     channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
@@ -168,6 +169,7 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     }
   }
   for (const sequence of [
+    ['Idle', 'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'Idle'],
     ['Idle', 'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome', 'Idle'],
     ['Idle', 'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome', 'Idle'],
   ]) {
@@ -180,6 +182,22 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   const breath = samples('Sleep', named.Torso, 'translation');
   assert(breath.some(([, height]) => height > breath[0][1]));
   assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0]);
+
+  for (const name of ['Bath water', 'Bath foam', 'Bath droplet 1']) {
+    assert.deepEqual(gltf.nodes[named[name]].scale, [0, 0, 0]);
+    assert(samples('BathWash', named[name], 'scale').some(([scale]) => scale > 0));
+    assert.deepEqual(samples('BathShake', named[name], 'scale').at(-1), [0, 0, 0]);
+  }
+  assert(samples('BathWash', 0, 'weights').some(([weight]) => weight > .7));
+  const spin = samples('DressTurn', ground, 'rotation');
+  assert(spin.some(([, turn]) => turn > .99));
+  for (const [name, bone] of [['Blue T-shirt', 'Torso'], ['Yellow Raincoat', 'Torso'], ['Red Cap', 'Head']]) {
+    assert(gltf.nodes[named[bone]].children.includes(named[name]));
+    const primitive = gltf.meshes[gltf.nodes[named[name]].mesh].primitives[0];
+    const material = gltf.materials[primitive.material];
+    assert.equal(material.alphaMode, 'MASK');
+    assert.equal(material.pbrMetallicRoughness.baseColorFactor[3], 0);
+  }
 
   const ball = named['Beach ball'];
   assert(!gltf.skins[0].joints.includes(ball));
@@ -250,12 +268,13 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
 
 
 for (const [action, room, clips] of [
+  ['care', 'bathroom', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
   ['sleep', 'bedroom', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
   ['play', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
 ]) {
   test(action + ' visits the correct room and completes before restoring the original room', async t => {
     const { window } = new JSDOM(
-      '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"></div></div>',
+      '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"><button id="bath"></button></div></div>',
       { runScripts: 'outside-only', pretendToBeVisual: true },
     );
     t.after(() => window.close());
@@ -277,6 +296,14 @@ for (const [action, room, clips] of [
     });
     window.eval(run);
     const viewer = window.document.getElementById('jerryBaby3D');
+    const fur = {
+      baseColorFactor: [1, 1, 1, 1],
+      roughnessFactor: 1,
+      setBaseColorFactor(color) { this.baseColorFactor = color; },
+      setRoughnessFactor(roughness) { this.roughnessFactor = roughness; },
+    };
+    viewer.model = { materials: [{ name: 'BakedMaterial', pbrMetallicRoughness: fur }] };
+    const bathButton = window.document.getElementById('bath');
     viewer.dispatchEvent(new window.Event('load'));
     await settle();
     scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action } }));
@@ -284,11 +311,56 @@ for (const [action, room, clips] of [
     for (const clip of clips) {
       assert.equal(canvas.className, 'room-' + room);
       assert.equal(viewer.animationName, clip);
+      assert(bathButton.disabled);
+      if (clip === 'BathWash') {
+        viewer.currentTime = .8;
+        frames.shift()();
+        assert(fur.baseColorFactor[0] < 1 && fur.roughnessFactor < 1);
+        scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action: 'touch' } }));
+        assert.equal(viewer.animationName, clip);
+      }
       viewer.currentTime = 3.7;
       frames.shift()();
       await settle();
     }
     assert.equal(canvas.className, 'room-living');
     assert.equal(viewer.animationName, 'Idle');
+    assert.equal(bathButton.disabled, false);
+    assert.equal(fur.baseColorFactor[0], 1);
+    assert.equal(fur.roughnessFactor, 1);
   });
 }
+
+
+test('Dress equips starter clothes without spending coins and reloads both wardrobe slots', () => {
+  const { mount } = require('./support/mini-harness.cjs');
+  const app = mount({ coins: 45, xp: 0, world: { room: 'living' } });
+  try {
+    app.w.eval(fs.readFileSync(path.join(root, 'world.js'), 'utf8'));
+    const actions = [];
+    app.$('#scene').addEventListener('pawtopia-jerry-action', event => actions.push(event.detail.action));
+    for (const id of ['baby-blue-shirt', 'baby-red-cap', 'baby-yellow-coat']) {
+      app.click('#dress');
+      app.click(`[data-dress-item="${id}"]`);
+      assert(app.$('#worldOverlay').hidden);
+    }
+    assert.deepEqual(actions, ['dress', 'dress-show', 'dress', 'dress-show', 'dress', 'dress-show']);
+    for (const room of ['kitchen', 'bedroom', 'bathroom', 'garden', 'living']) {
+      assert(app.w.pawtopiaWorld.commit('room', room).ok);
+      assert.deepEqual(app.save().world.equipped, { outfit: 'baby-yellow-coat', hat: 'baby-red-cap' });
+    }
+    const restored = mount(app.save());
+    try {
+      restored.w.eval(fs.readFileSync(path.join(root, 'world.js'), 'utf8'));
+      assert.equal(restored.save().coins, 45);
+      assert.deepEqual(restored.save().world.equipped, { outfit: 'baby-yellow-coat', hat: 'baby-red-cap' });
+      restored.click('#dress');
+      restored.click('[data-dress-item="baby-red-cap"]');
+      assert.deepEqual(restored.save().world.equipped, { outfit: 'baby-yellow-coat' });
+    } finally {
+      restored.close();
+    }
+  } finally {
+    app.close();
+  }
+});

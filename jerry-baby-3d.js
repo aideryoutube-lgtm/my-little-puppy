@@ -10,7 +10,44 @@ let currentRoom = '';
 let pendingAction;
 let sequence;
 let returnRoom;
+let wardrobe = [];
+let fur;
+let dryFur;
+let wetness = 0;
+const clothing = {
+  'Blue T-shirt': { slot: 'outfit', id: 'baby-blue-shirt' },
+  'Yellow Raincoat': { slot: 'outfit', id: 'baby-yellow-coat' },
+  'Red Cap': { slot: 'hat', id: 'baby-red-cap' }
+};
+const careButtons = ['food', 'sleep', 'bath', 'ball', 'dress'];
+
+function lockCare(locked) {
+  for (const id of careButtons) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = locked;
+  }
+}
+
+function syncClothes() {
+  if (!wardrobe.length) return;
+  const equipped = window.pawtopiaWorld?.snapshot().world?.equipped;
+  for (const { material, slot, id } of wardrobe) {
+    const [r, g, b, a] = material.baseColorFactor;
+    const visible = Number(equipped?.[slot] === id);
+    if (a !== visible) material.setBaseColorFactor([r, g, b, visible]);
+  }
+}
+
+function wetFur(amount) {
+  if (!fur || amount === wetness) return;
+  wetness = amount;
+  fur.setBaseColorFactor(dryFur.color.map((channel, i) => i === 3 ? channel : channel * (1 - amount * .36)));
+  fur.setRoughnessFactor(dryFur.roughness * (1 - amount * .78));
+}
+document.addEventListener('pawtopia-state', syncClothes);
 const careActions = {
+  care: { room: 'bathroom', route: [.40, .86, .53, .79],
+    clips: ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome'] },
   feed: { room: 'kitchen', route: [.35, .91, .61, .77], clips: ['WalkToBowl', 'Eat', 'WalkHome'] },
   sleep: { room: 'bedroom', route: [.38, .81, .52, .74],
     clips: ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome'] },
@@ -25,6 +62,7 @@ async function play(name) {
   const target = viewer;
   clip = name;
   target.animationName = name;
+  wetFur(name === 'BathShake' ? 1 : 0);
   // The renderer applies animationName asynchronously with its default loop mode.
   await target.updateComplete;
   if (request !== playbackRequest || viewer !== target || target.hidden || document.hidden) return;
@@ -39,6 +77,8 @@ async function play(name) {
     function blendAtEnd() {
       if (request !== playbackRequest || viewer !== target || !sequence) return;
       const time = target.currentTime;
+      if (name === 'BathWash') wetFur(Math.min(1, time / .65));
+      if (name === 'BathShake') wetFur(Math.max(0, Math.min(1, (1.55 - time) / .72)));
       if (target.duration > 0 && (time >= target.duration - .36 || time < previousTime)) {
         finished();
       } else {
@@ -84,6 +124,8 @@ function clearCareRoute([left, right, top, bottom]) {
 }
 
 function cancelCare() {
+  lockCare(false);
+  wetFur(0);
   pendingAction = undefined;
   sequence = undefined;
   returnRoom = undefined;
@@ -107,6 +149,7 @@ function startCare() {
   }
   clearTimeout(walkTimer);
   sequence = action;
+  lockCare(true);
   play(action.clips[0]);
 }
 
@@ -126,6 +169,7 @@ function finished() {
 
 function idle() {
   clearTimeout(walkTimer);
+  lockCare(false);
   play('Idle');
   startCare();
   if (sequence || motionReduced()) return;
@@ -144,7 +188,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=4',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=5',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -157,6 +201,12 @@ function sync() {
       'shadow-intensity': '0.7'
     })) viewer.setAttribute(name, value);
     viewer.addEventListener('load', () => {
+      const materials = viewer.model?.materials ?? [];
+      wardrobe = materials.filter(material => Object.hasOwn(clothing, material.name))
+        .map(material => ({ ...clothing[material.name], material: material.pbrMetallicRoughness }));
+      fur = materials.find(material => material.name === 'BakedMaterial')?.pbrMetallicRoughness;
+      if (fur) dryFur = { color: Array.from(fur.baseColorFactor), roughness: fur.roughnessFactor };
+      syncClothes();
       ready = true;
       viewer.dismissPoster();
       sync();
@@ -170,6 +220,8 @@ function sync() {
       cancelCare();
       viewer.remove();
       viewer = undefined;
+      wardrobe = [];
+      fur = undefined;
       sync();
     });
     scene.prepend(viewer);
@@ -201,8 +253,15 @@ scene.addEventListener('pawtopia-jerry-action', event => {
     startCare();
     return;
   }
+  if (action === 'dress-show' && ready && !viewer.hidden && !sequence && !roomBlocked() &&
+      !motionReduced() && viewer.availableAnimations?.includes('DressTurn')) {
+    clearTimeout(walkTimer);
+    lockCare(true);
+    play('DressTurn');
+    return;
+  }
   if (action !== 'touch' || !ready || viewer.hidden || !clip ||
-      sequence || clip === 'Happy' || motionReduced()) return;
+      sequence || clip === 'Happy' || clip === 'DressTurn' || motionReduced()) return;
   clearTimeout(walkTimer);
   play('Happy');
 });

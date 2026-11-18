@@ -484,6 +484,211 @@ clip('ChaseBall', 1.05 + blend_hold, chase_ball)
 clip('PlayHappy', 1.5 + blend_hold, ball_happy)
 clip('PlayWalkHome', 2 * turn_time + (ball_approach + chase_distance) * period / stride + blend_hold,
      play_home)
+def prop_material(name, color, roughness, alpha_mode='OPAQUE'):
+    index = len(gltf['materials'])
+    gltf['materials'].append(dict(name=name, doubleSided=True, alphaMode=alpha_mode,
+                                 pbrMetallicRoughness=dict(baseColorFactor=color,
+                                     metallicFactor=0, roughnessFactor=roughness)))
+    return index
+
+
+def ellipsoid(center, radii):
+    rings, sides = 8, 16
+    points, normals, indices = [], [], []
+    for ring in range(rings + 1):
+        theta = math.pi * ring / rings
+        for side in range(sides):
+            phi = math.tau * side / sides
+            unit = np.array([math.sin(theta) * math.cos(phi), math.cos(theta),
+                             math.sin(theta) * math.sin(phi)])
+            points.append(np.asarray(center) + unit * radii)
+            normal = unit / radii
+            normals.append(normal / np.linalg.norm(normal))
+            if ring < rings:
+                a = ring * sides + side
+                b = ring * sides + (side + 1) % sides
+                indices.extend([a, a + sides, b, b, a + sides, b + sides])
+    return points, normals, indices
+
+
+def prop_mesh(name, parts, material):
+    points, normals, indices = [], [], []
+    for vertices_part, normals_part, indices_part in parts:
+        indices.extend(len(points) + i for i in indices_part)
+        points.extend(vertices_part)
+        normals.extend(normals_part)
+    # These small props use a 16-bit index buffer.
+    while len(binary) % 4:
+        binary.append(0)
+    view = len(gltf['bufferViews'])
+    packed = np.asarray(indices, dtype='<u2').tobytes()
+    gltf['bufferViews'].append(dict(buffer=0, byteOffset=len(binary), byteLength=len(packed)))
+    binary.extend(packed)
+    index_accessor = len(gltf['accessors'])
+    gltf['accessors'].append(dict(bufferView=view, componentType=5123, count=len(indices), type='SCALAR'))
+    mesh = len(gltf['meshes'])
+    gltf['meshes'].append(dict(name=name, primitives=[dict(
+        attributes=dict(POSITION=add_accessor(points, 'VEC3', bounds=True),
+                        NORMAL=add_accessor(normals, 'VEC3')),
+        indices=index_accessor, material=material)]))
+    return mesh
+
+
+def prop_node(name, mesh, parent, hidden=False):
+    node = len(nodes)
+    nodes.append(dict(name=name, mesh=mesh, scale=[0 if hidden else 1] * 3))
+    if parent is None:
+        gltf['scenes'][0]['nodes'].append(node)
+    else:
+        nodes[parent].setdefault('children', []).append(node)
+    return node
+
+
+def garment(coat):
+    # Open neck and hem. The coat is an open cape and leaves the collar
+    # front exposed. The shirt wraps farther down the sides of the torso.
+    points, normals, indices = [], [], []
+    rings = ([(-.65, .36), (-.61, .40), (-.48, .43), (-.20, .43), (.02, .41), (.12, .38)]
+             if coat else [(-.52, .39), (-.49, .43), (-.37, .44), (-.09, .42), (.12, .43), (.19, .41)])
+    sides = 30
+    for row, (depth, width) in enumerate(rings):
+        for side in range(sides + 1):
+            span = 1.86 if coat else 2.28
+            angle = span * (2 * side / sides - 1)
+            y_top = .14 if coat else .115
+            # The fur arches higher toward the neck. Match that slope
+            # without bringing the garment into the muzzle or medallion.
+            rise = .18 * smooth((depth + .45) / .66)
+            x_at = width * math.sin(angle)
+            y_at = -.39 + (y_top + .39 + rise) * math.cos(angle)
+            points.append((x_at, y_at, depth + .06 * math.cos(angle)) - positions[body])
+            normal = np.array([math.sin(angle), math.cos(angle), -.14])
+            normals.append(normal / np.linalg.norm(normal))
+            if row < len(rings) - 1 and side < sides:
+                a = row * (sides + 1) + side
+                b = a + sides + 1
+                indices.extend([a, a + 1, b, b, a + 1, b + 1])
+    return points, normals, indices
+
+
+for name, color, coat in [('Blue T-shirt', [.025, .26, .88, 0], False),
+                          ('Yellow Raincoat', [.98, .66, .025, 0], True)]:
+    material = prop_material(name, color, .46 if coat else .89, 'MASK')
+    mesh = prop_mesh(name, [garment(coat)], material)
+    prop_node(name, mesh, body)
+    if not coat:
+        for side, (upper, _) in zip((-1, 1), legs[:2]):
+            sleeve = prop_mesh(f'{name} sleeve', [
+                ellipsoid(np.array([side * .285, -.37, .25]) - positions[upper], [.145, .19, .155])
+            ], material)
+            prop_node(f'{name} sleeve', sleeve, upper)
+
+cap_material = prop_material('Red Cap', [.78, .035, .055, 0], .8, 'MASK')
+cap_mesh = prop_mesh('Red Cap', [
+    ellipsoid(np.array([0., .70, .37]) - positions[head], [.23, .14, .23]),
+    ellipsoid(np.array([0., .625, .59]) - positions[head], [.22, .021, .23]),
+    ellipsoid(np.array([0., .835, .37]) - positions[head], [.032, .018, .035]),
+], cap_material)
+prop_node('Red Cap', cap_mesh, head)
+
+bath_heading = math.radians(120)
+bath_distance = .56
+bath_travel = bath_distance * period / stride
+bath_origin = np.array([bath_distance * math.sin(bath_heading), -.93,
+                        bath_distance * math.cos(bath_heading)])
+water_material = prop_material('Bath water', [.05, .55, .82, .60], .23, 'BLEND')
+water = prop_node('Bath water', prop_mesh('Bath water', [
+    ellipsoid((0, 0, 0), [.70, .026, .71]),
+    ellipsoid((.38, .012, -.26), [.25, .014, .20]),
+], water_material), None, True)
+foam_material = prop_material('Bath foam', [.84, .95, 1, 1], .34)
+foam_shapes = [ellipsoid((.51 * math.cos(i * 2.4), .035 + .04 * (i % 4),
+                          .51 * math.sin(i * 2.4)), [.115, .09 + .025 * (i % 3), .11])
+               for i in range(17)]
+foam = prop_node('Bath foam', prop_mesh('Bath foam', foam_shapes, foam_material), None, True)
+drop_mesh = prop_mesh('Bath droplet', [ellipsoid((0, 0, 0), [.034, .059, .034])], water_material)
+drops = [prop_node(f'Bath droplet {i + 1}', drop_mesh, None, True) for i in range(9)]
+
+
+def bath_pose(sit, t, washing=0, shake=0):
+    data = route_pose(bath_distance, bath_heading, bath_heading)
+    drop = sit * .21
+    pitch = -.23 * sit
+    offset(data, body, dy=-drop)
+    data[body, 'rotation'] = quaternion(0, pitch)
+    for i, (upper, paw) in enumerate(legs):
+        lift = .12 * washing * max(0, math.sin(math.tau * 1.15 * t + i * math.pi))
+        crouch = .035 if i < 2 else .17
+        # Convert the desired paw target back into torso space so tilting
+        # the body during the sit keeps the planted paws at floor height.
+        _, py, pz = positions[paw] - positions[body]
+        y_target = py + drop + (lift if i < 2 else 0)
+        z_target = pz + (crouch + .065) * sit
+        dy = y_target * math.cos(pitch) + z_target * math.sin(pitch) - py
+        dz = -y_target * math.sin(pitch) + z_target * math.cos(pitch) - pz
+        offset(data, upper, dy=dy * .58, dz=dz * .58)
+        offset(data, paw, dy=dy * .42, dz=dz * .42)
+    wobble = shake * math.sin(math.tau * 6 * t)
+    data[neck, 'rotation'] = quaternion(0, .18 * sit + .26 * washing)
+    data[head, 'rotation'] = quaternion(2, .15 * washing * math.sin(math.tau * t) + .40 * wobble)
+    data[tail, 'rotation'] = quaternion(1, -.56 * wobble)
+    for side, ear in zip((-1, 1), ears):
+        data[ear, 'rotation'] = quaternion(2, side * .18 * washing + .32 * wobble)
+    data[0, 'weights'] = max(washing * max(0, 1 - abs((t % 1.24) - .62) / .13), shake * .84)
+    return data
+
+
+def bath_effects(data, level, t=0, spray=0):
+    for node, y, amount in [(water, .018, level), (foam, .058, level)]:
+        data[node, 'translation'] = bath_origin + [0, y, 0]
+        data[node, 'scale'] = [amount] * 3
+    for i, node in enumerate(drops):
+        phase = (t * (1.5 if spray else 1.05) + i / len(drops)) % 1
+        angle = i * 2.4
+        radius = (.22 + (.85 if spray else .25) * phase)
+        height = (.48 if spray else .13) + (.82 if spray else .36) * math.sin(math.pi * phase)
+        data[node, 'translation'] = bath_origin + [radius * math.cos(angle), height,
+                                                   radius * math.sin(angle)]
+        data[node, 'scale'] = [max(level, spray) * math.sin(math.pi * phase)] * 3
+    return data
+
+
+def sit_bath(t):
+    sit = smooth(t / .85)
+    return bath_effects(bath_pose(sit, t), smooth((t - .55) / .28))
+
+
+def wash_bath(t):
+    wash = smooth(t / .32) * (1 - smooth((t - 2.30) / .48))
+    return bath_effects(bath_pose(1, t, washing=wash), 1, min(t, 2.78))
+
+
+def shake_bath(t):
+    shake = smooth((t - .47) / .19) * (1 - smooth((t - 1.38) / .30))
+    return bath_effects(bath_pose(1 - smooth(t / .48), t, shake=shake),
+                        1 - smooth(t / .51), t, spray=shake)
+
+
+def dress_turn(t):
+    t = min(t, 2.05)
+    data = happy(min(t, 1.5))
+    angle = math.tau * smooth(t / 2.05)
+    data[root, 'rotation'] = quaternion(1, angle)
+    effort = .78 * smooth(t / .24) * (1 - smooth((t - 1.69) / .36))
+    hop = max(0, math.sin(math.pi * np.clip((t - .35) / .62, 0, 1)))**2
+    walk_steps(data, t, .45, stride, .12 * hop, True, effort)
+    return data
+
+
+clip('WalkToBath', turn_time + bath_travel + blend_hold,
+     lambda t: route_walk(t, route_heading=bath_heading, distance=bath_distance))
+clip('BathSit', .85 + blend_hold, sit_bath)
+clip('BathWash', 2.78 + blend_hold, wash_bath)
+clip('BathShake', 1.70 + blend_hold, shake_bath)
+clip('BathWalkHome', 2 * turn_time + bath_travel + blend_hold,
+     lambda t: route_walk(t, home=True, route_heading=bath_heading, distance=bath_distance))
+clip('DressTurn', 2.05 + blend_hold, dress_turn)
+
 gltf['buffers'][0]['byteLength'] = len(binary)
 metadata = json.dumps(gltf, separators=(',', ':')).encode()
 metadata += b' ' * (-len(metadata) % 4)

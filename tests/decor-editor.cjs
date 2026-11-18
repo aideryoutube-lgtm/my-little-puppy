@@ -21,7 +21,8 @@ test('All stages keep their room art and emit one event per action without reque
    a.$('#scene').addEventListener('pawtopia-jerry-action', e=>actions.push(e.detail));
    a.click('#editDecorButton');a.click('#decorDoneButton');
    for(const button of ['#food','#sleep','#bath','#ball','#dress'])a.click(button);
-   assert.equal(a.$('[data-category="Outfits"]').getAttribute('aria-pressed'),'true');
+   if(stage==='Baby')assert.equal(a.w.document.querySelectorAll('[data-dress-item]').length,3);
+   else assert.equal(a.$('[data-category="Outfits"]').getAttribute('aria-pressed'),'true');
    a.click('#worldClose');a.click('#home');a.click('#portrait');
    assert.deepEqual(actions.map(e=>e.action),['feed','sleep','care','play','dress','house','touch']);
    assert(actions.every(e=>e.stage===stage));
