@@ -84,6 +84,36 @@ function positionSleeping(name, time, duration) {
     'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge'].includes(name) ||
     (name === 'JumpUp' && progress >= .88) || (name === 'JumpDown' && progress <= .12));
 }
+// Floor anchors are normalized to the shared 941 × 1672 garden artwork.
+const gardenStart = [.60, .760132, 1];
+const houseThreshold = [789 / 941, 850 / 1672, .58];
+const houseCushion = [793 / 941, 735 / 1672, .48];
+
+// Timings match the four-paw gait and stationary holds in rig-jerry-baby.py.
+const houseTravel = {
+  WalkToHouse: [gardenStart, houseThreshold, .5, 4.2],
+  EnterHouse: [houseThreshold, houseCushion, .25, 1.12],
+  RestInside: [houseCushion, houseCushion, 0, 1],
+  ExitHouse: [houseCushion, houseThreshold, .25, 1.12],
+  Stretch: [houseThreshold, houseThreshold, 0, 1],
+  HouseWalkHome: [houseThreshold, gardenStart, .5, 4.2]
+};
+
+function positionAtHouse(name, time) {
+  const [from, to, delay, duration] = houseTravel[name];
+  const progress = Math.max(0, Math.min(1, (time - delay) / duration));
+  const [x, y, size] = from.map((value, i) => value + (to[i] - value) * progress);
+  scene.style.setProperty('--house-x', x * 100 + '%');
+  scene.style.setProperty('--house-y', y * 100 + '%');
+  scene.style.setProperty('--house-scale', 1.875 * size);
+  const depth = name === 'RestInside' ? 1 :
+    name === 'EnterHouse' ? progress : name === 'ExitHouse' ? 1 - progress : 0;
+  // Bring the overlaid wall forward as Jerry crosses the threshold.
+  scene.style.setProperty('--house-wall-depth', `${36 + 10 * Math.min(1, depth * 1.35)}%`);
+  scene.classList.add('baby-house-route');
+  scene.classList.toggle('baby-house-occluded', depth > 0);
+}
+
 const feedStates = { WalkToBowl: 'WalkingToBowl', Eat: 'Eating', WalkHome: 'WalkingHome' };
 
 function makeFoodLayer() {
@@ -242,7 +272,7 @@ const careActions = {
   care: { room: 'bathroom', route: [.40, .86, .53, .79],
     clips: ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome'] },
   feed: { room: 'kitchen', route: [.44, .94, .63, .78], clips: ['WalkToBowl', 'Eat', 'WalkHome'] },
-  house: { room: 'garden', route: [.19, .66, .64, .78],
+  house: { room: 'garden', route: [.55, .92, .44, .80],
     clips: ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'] },
   drink: { room: 'kitchen', route: [.44, .95, .71, .82],
     clips: ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'] },
@@ -259,7 +289,8 @@ async function play(name) {
   const target = viewer;
   clip = name;
   const sleeping = care?.action === 'sleep' && name !== 'Idle';
-  target.animationCrossfadeDuration = sleeping ? 0 : 250;
+  const visitingHouse = care?.action === 'house' && name !== 'Idle';
+  target.animationCrossfadeDuration = sleeping || visitingHouse ? 0 : 250;
   target.animationName = name;
   wetFur(name === 'BathShake' ? 1 : 0);
   // The renderer applies animationName asynchronously with its default loop mode.
@@ -268,8 +299,9 @@ async function play(name) {
   const sequenceClip = Boolean(care && name !== 'Idle');
   const feeding = sequenceClip && care.action === 'feed';
   if (feeding) positionFeeding(name, 0);
+  if (visitingHouse) positionAtHouse(name, 0);
   if (sequenceClip) target.currentTime = 0;
-  target.play(name === 'Idle' || (sequenceClip && !feeding && !sleeping) ? {} : { repetitions: 1, pingpong: false });
+  target.play(name === 'Idle' || (sequenceClip && !feeding && !sleeping && !visitingHouse) ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
   if (care && !(target.duration > 0)) {
     stopCare('Renderer did not select clip ' + name, true);
@@ -312,9 +344,17 @@ async function play(name) {
           return;
         }
       }
+      if (visitingHouse) {
+        positionAtHouse(name, time);
+        if (time >= target.duration) {
+          advanceCare();
+          return;
+        }
+        if (target.paused) lastProgressAt = timestamp;
+      }
       if (name === 'BathWash') wetFur(Math.min(1, time / .65));
       if (name === 'BathShake') wetFur(Math.max(0, Math.min(1, (1.55 - time) / .72)));
-      if (!sleeping && target.duration > 0 && (time >= target.duration - .36 || looped)) {
+      if (!sleeping && !visitingHouse && target.duration > 0 && (time >= target.duration - .36 || looped)) {
         advanceCare();
       } else {
         // model-viewer suspends its mixer when scrolled out of view.
@@ -379,6 +419,12 @@ function stopCare(reason, restoreRoom = false) {
   if (care) careDebug(care.action + ': ' + reason);
   const meal = care?.action === 'feed' && care;
   const sleeping = care?.action === 'sleep';
+  if (care?.action === 'house') {
+    scene.classList.remove('baby-house-route', 'baby-house-occluded');
+    for (const property of ['--house-x', '--house-y', '--house-scale', '--house-wall-depth']) {
+      scene.style.removeProperty(property);
+    }
+  }
   if (sleeping) {
     scene.classList.remove('baby-dreaming', 'baby-bed-route', 'baby-on-mattress');
     for (const property of ['--sleep-x', '--sleep-y', '--sleep-scale', '--mattress-load']) {
@@ -463,7 +509,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=9',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=10',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -512,7 +558,10 @@ function sync() {
     dreams.id = 'babySleepDreams';
     dreams.setAttribute('aria-hidden', 'true');
     dreams.textContent = 'Zzz';
-    scene.prepend(edge, pressure, dreams);
+    const houseFacade = document.createElement('div');
+    houseFacade.id = 'babyHouseFacade';
+    houseFacade.setAttribute('aria-hidden', 'true');
+    scene.prepend(edge, pressure, dreams, houseFacade);
   }
   if (viewer) {
     const room = roomName();

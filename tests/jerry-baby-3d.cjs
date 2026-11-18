@@ -222,10 +222,13 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     assert(keys.some(key => key.some((value, axis) => value !== keys[0][axis])));
   }
   for (const name of ['Open doghouse', 'Doghouse pitched roof']) {
-    const node = named[name];
-    assert(gltf.scenes[0].nodes.includes(node));
-    const walls = samples('EnterHouse', node, 'translation');
-    assert(walls.every(key => key.every((value, axis) => value === walls[0][axis])));
+    assert.equal(named[name], undefined);
+  }
+  for (const node of Object.keys(named).filter(name => name.endsWith('paw'))) {
+    for (const walk of ['WalkToHouse', 'EnterHouse', 'ExitHouse', 'HouseWalkHome']) {
+      const heights = samples(walk, named[node], 'translation').map(([, height]) => height);
+      assert(Math.max(...heights) - Math.min(...heights) > .035);
+    }
   }
   assert(samples('Sleep', 0, 'weights').every(([weight]) => weight === 1));
   const breath = samples('Sleep', named.Torso, 'translation');
@@ -536,12 +539,27 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
         act(blocked);
       }
       assert.equal(viewer.animationName, clip);
-      viewer.currentTime = 3.7;
+      if (action === 'house') {
+        assert(scene.classList.contains('baby-house-route'));
+        if (clip === 'WalkToHouse' || clip === 'HouseWalkHome') {
+          const startX = parseFloat(scene.style.getPropertyValue('--house-x'));
+          viewer.currentTime = 2.1;
+          frames.shift()(2100);
+          const currentX = parseFloat(scene.style.getPropertyValue('--house-x'));
+          assert(clip === 'WalkToHouse' ? currentX > startX : currentX < startX);
+        }
+        if (clip === 'RestInside') {
+          assert.equal(scene.style.getPropertyValue('--house-wall-depth'), '46%');
+          assert.equal(parseFloat(scene.style.getPropertyValue('--house-y')), 735 / 1672 * 100);
+        }
+      }
+      viewer.currentTime = action === 'house' ? viewer.duration : 3.7;
       frames.shift()();
       await settle();
     }
     assert.equal(viewer.animationName, 'Idle');
     assert.equal(canvas.className, 'room-' + origin);
+    assert(!scene.classList.contains('baby-house-route'));
     assert(!home.disabled && !scene.hasAttribute('data-care-busy'));
   }
 });
@@ -721,7 +739,7 @@ test('Real action buttons complete each care route from every permitted room', a
           assert.equal(played.at(-1), clip);
           if (isFeed) assert.equal(portions(), 0);
         }
-        viewer.currentTime = isFeed || isSleep ? viewer.duration : 3.7;
+        viewer.currentTime = isFeed || isSleep || button === '#home' ? viewer.duration : 3.7;
         frames.shift()();
         await settle();
       }

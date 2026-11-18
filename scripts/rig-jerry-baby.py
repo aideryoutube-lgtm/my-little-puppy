@@ -809,9 +809,6 @@ clip('BathWalkHome', 2 * turn_time + bath_travel + blend_hold,
 clip('DressTurn', 2.05 + blend_hold, dress_turn)
 
 
-# Both props are attached to the scene, independent of Jerry's skeleton.
-# The open doorway is modeled with solid jambs and a lintel so normal depth
-# testing hides Jerry behind the walls and roof as he crosses the threshold.
 def solid(points, faces):
     vertices, normals = [], []
     for a, b, c in faces:
@@ -822,71 +819,55 @@ def solid(points, faces):
     return vertices, normals, list(range(len(vertices)))
 
 
-def box(x, y, z, w, h, d):
-    points = [(x + a * w / 2, y + b * h / 2, z + c * d / 2)
-              for a, b, c in [(-1,-1,-1), (1,-1,-1), (1,1,-1), (-1,1,-1),
-                              (-1,-1,1), (1,-1,1), (1,1,1), (-1,1,1)]]
-    return solid(points, [(0,2,1), (0,3,2), (4,5,6), (4,6,7), (0,4,7), (0,7,3),
-                          (1,2,6), (1,6,5), (3,7,6), (3,6,2), (0,1,5), (0,5,4)])
+# House clips animate the existing skeleton in place. The garden renderer
+# follows the painted doorway in screen space using these phase timings.
+house_heading = math.radians(-135)
+house_outward = house_heading + math.pi
+house_lawn_heading = math.radians(170)
+house_return_heading = house_lawn_heading - math.pi
+house_walk_time = 4.2
+house_entry_time = 1.12
 
 
-house_heading = math.radians(-120)
-house_approach = .42
-house_inside = 2.30
-house_entry_time = (house_inside - house_approach) * period / stride
-house_origin = [(house_approach + .85) * math.sin(house_heading), -.93,
-                (house_approach + .85) * math.cos(house_heading)]
-wood = prop_material('House honey wood', [.52, .24, .08, 1], .82)
-roof = prop_material('House red roof', [.52, .055, .032, 1], .72)
-house_walls = prop_node('Open doghouse', prop_mesh('Open doghouse', [
-    box(-.74, .92, 1.24, .14, 1.84, 2.55), box(.74, .92, 1.24, .14, 1.84, 2.55),
-    box(0, .92, 2.51, 1.62, 1.84, .12),
-    box(-.70, .88, 0, .22, 1.76, .14), box(.70, .88, 0, .22, 1.76, .14),
-    box(0, 1.78, 0, 1.62, .14, .14),
-], wood), None, True)
-roof_points = [(-.94, 1.83, -.17), (0, 2.35, -.17), (.94, 1.83, -.17),
-               (-.94, 1.83, 2.66), (0, 2.35, 2.66), (.94, 1.83, 2.66)]
-house_roof = prop_node('Doghouse pitched roof', prop_mesh('Doghouse pitched roof', [
-    solid(roof_points, [(0,3,1), (1,3,4), (1,4,2), (2,4,5), (0,1,2), (3,5,4)])
-], roof), None, True)
+def house_walk(t, home=False):
+    start, heading = (house_outward, house_return_heading) if home else (0, house_lawn_heading)
+    if t < .5:
+        return bed_gait(t, .5, start, heading, 0, True)
+    t -= .5
+    if t < house_walk_time:
+        return bed_gait(t, house_walk_time, heading, heading, .68)
+    end, turn = (0, .5) if home else (house_heading + math.tau, .24)
+    return bed_gait(t - house_walk_time, turn, heading, end, 0, True)
 
 
-def with_house(data, visible=1):
-    for node in (house_walls, house_roof):
-        data[node, 'translation'] = house_origin
-        data[node, 'rotation'] = quaternion(1, house_heading)
-        # Keep the door and walls fixed during traversal.
-        data[node, 'scale'] = [visible] * 3
+def house_door(t, exiting=False):
+    heading = house_outward if exiting else house_heading
+    gait_time = t - .25
+    data = bed_gait(gait_time, house_entry_time, heading, heading, .34)
+    duck = smooth(t / .25) * (1 - smooth((gait_time - .88) / .24))
+    offset(data, body, dy=-.09 * duck)
+    for upper, paw in legs:
+        offset(data, upper, dy=.05 * duck)
+        offset(data, paw, dy=.04 * duck)
+    data[neck, 'rotation'] = quaternion(0, .48 * duck)
+    data[head, 'rotation'] = quaternion(0, .17 * duck)
     return data
 
 
 def house_rest(t):
-    t = min(t, 2.7)
-    crouch = smooth(t / .8) * (1 - smooth((t - 1.9) / .8))
-    data = route_pose(house_inside, house_heading, house_heading)
-    drop = crouch * (.26 + .011 * math.sin(math.tau * t / 1.2))
-    offset(data, body, dy=-drop)
-    for upper, paw in legs:
-        offset(data, upper, dy=drop * .65)
-        offset(data, paw, dy=drop * .35)
-    data[head, 'rotation'] = quaternion(0, .22 * crouch)
-    data[0, 'weights'] = crouch
-    return with_house(data)
-
-
-def house_exit(t):
-    # Back straight through the doorway, leaving the turn for WalkHome.
-    progress = np.clip(t / house_entry_time, 0, 1)
-    data = route_pose(house_inside - (house_inside - house_approach) * progress,
-                      house_heading, house_heading)
-    effort = smooth(t / .10) * smooth((house_entry_time - t) / .12)
-    walk_steps(data, -t, period, stride, 0, False, effort)
-    return with_house(data)
+    if t < .58:
+        return bed_gait(t, .58, house_heading, house_outward, 0, True)
+    t -= .58
+    crouch = smooth(t / .62) * (1 - smooth((t - 2.9) / .64))
+    breath = crouch * .018 * math.sin(math.tau * t / 1.12)
+    data = sleep_pose(crouch, crouch, breath=breath)
+    data[root, 'rotation'] = quaternion(1, house_outward)
+    return data
 
 
 def house_stretch(t):
     amount = math.sin(math.pi * min(t / 1.28, 1))**2
-    data = route_pose(house_approach, house_heading, house_heading)
+    data = bed_stand(house_outward)
     offset(data, body, dy=-.12 * amount)
     for upper, paw in legs:
         offset(data, upper, dy=.08 * amount)
@@ -897,21 +878,15 @@ def house_stretch(t):
     data[neck, 'rotation'] = quaternion(0, .36 * amount)
     data[head, 'rotation'] = quaternion(0, -.19 * amount)
     data[tail, 'rotation'] = quaternion(0, -.38 * amount)
-    return with_house(data)
+    return data
 
 
-house_walk_time = house_approach * period / stride
-clip('WalkToHouse', turn_time + house_walk_time + blend_hold,
-     lambda t: with_house(route_walk(t, route_heading=house_heading, distance=house_approach)))
-clip('EnterHouse', turn_time + house_entry_time + blend_hold,
-     lambda t: with_house(route_walk(t, route_heading=house_heading, start=house_approach,
-                                     distance=house_inside - house_approach)))
-clip('RestInside', 2.7 + blend_hold, house_rest)
-clip('ExitHouse', house_entry_time + blend_hold, house_exit)
-clip('Stretch', 1.28 + blend_hold, house_stretch)
-clip('HouseWalkHome', 2 * turn_time + house_walk_time + blend_hold,
-     lambda t: with_house(route_walk(t, home=True, route_heading=house_heading,
-                                    distance=house_approach)))
+clip('WalkToHouse', .5 + house_walk_time + .24, house_walk)
+clip('EnterHouse', .25 + house_entry_time, house_door)
+clip('RestInside', .58 + 3.54, house_rest)
+clip('ExitHouse', .25 + house_entry_time, lambda t: house_door(t, exiting=True))
+clip('Stretch', 1.28, house_stretch)
+clip('HouseWalkHome', .5 + house_walk_time + .5, lambda t: house_walk(t, home=True))
 
 
 def annulus(inner, outer, low, high):

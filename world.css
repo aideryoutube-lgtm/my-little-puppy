@@ -336,7 +336,32 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
  100%{transform:translateY(-12px);opacity:0}
 }
 
-.room-garden:has(> #scene.jerry-baby-3d-ready){background-image:url("./assets/rooms/Garden-Baby.webp")}
+/* The 3D layer and the facade sample the same registered garden artwork.
+   The opening follows the inner arch. The sill stays in front of the paws. */
+.room-garden{--garden-art:url('./assets/rooms/Garden.png')}
+.room-garden:has(> #scene.jerry-baby-3d-ready){--garden-art:url('./assets/rooms/Garden-Baby.webp')}
+.room-canvas.room-garden{background-image:var(--garden-art);background-size:100% 100%}
+.room-garden #scene.baby-house-route #jerryBaby3D{
+ left:calc(var(--house-x) - var(--baby-viewport) / 2);
+ top:calc(var(--house-y) - 14.7132%);bottom:auto;scale:var(--house-scale);
+}
+#babyHouseFacade{display:none}
+.room-garden > #scene.baby-house-occluded #babyHouseFacade{
+ display:block;position:absolute;inset:0;z-index:3;pointer-events:none;
+ clip-path:inset(0 0 calc(100% - var(--house-wall-depth)) 0);
+}
+.room-garden #babyHouseFacade::before{
+ content:'';position:absolute;inset:0;
+ background:var(--garden-art) center/100% 100% no-repeat;
+ clip-path:polygon(evenodd,
+  69.8193% 35.7656%, 82.3592% 27.9306%, 100.0000% 29.0072%, 100.0000% 42.3445%, 97.4495% 42.5837%,
+  94.8990% 43.7201%, 91.8172% 45.0359%, 90.4357% 45.4545%, 90.4357% 44.5574%, 90.4357% 40.0718%,
+  90.0106% 38.6962%, 89.0542% 37.3804%, 87.7790% 36.5431%, 86.1849% 36.0048%, 84.4846% 35.7656%,
+  82.9968% 35.8254%, 81.2965% 36.2440%, 79.7024% 37.0215%, 78.7460% 38.0383%, 78.3209% 39.1746%,
+  78.4272% 44.3780%, 90.4357% 44.5574%, 90.4357% 45.4545%, 73.3262% 44.9163%, 72.9012% 44.4378%,
+  73.3262% 35.9450%);
+}
+.room-garden.night #babyHouseFacade::before{background-color:#474978;background-blend-mode:multiply}
 
 /* Cover the painted bowl only when the 3D replacement is ready. */
 .room-canvas.room-kitchen:has(> #scene.jerry-baby-3d-ready.baby-food-bowl-ready){background-image:url('./assets/rooms/Kitchen-Baby-closed.webp')}
