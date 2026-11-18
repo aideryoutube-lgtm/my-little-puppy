@@ -283,9 +283,9 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 #jerryBaby3D{
  position:absolute;z-index:2;left:calc(var(--baby-center) - var(--baby-viewport, 37%) / 2);width:var(--baby-viewport, 37%);height:18.3%;
  bottom:calc(var(--baby-floor) - 3.6%);background:transparent;pointer-events:none;
- --poster-color:transparent;visibility:hidden;transform-origin:50% 80.4%;scale:1.875;
+ --poster-color:transparent;visibility:visible;opacity:0;transform-origin:50% 80.4%;scale:1.875;
 }
 #jerryBaby3D[hidden]{display:none}
-#scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible}
+#scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible;opacity:1}
 
 .room-garden:has(> #scene.jerry-baby-3d-ready){background-image:url("./assets/rooms/Garden-Baby.webp")}
