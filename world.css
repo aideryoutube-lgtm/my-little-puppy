@@ -277,7 +277,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-kitchen{--baby-center:50%;--baby-floor:26%;--baby-viewport:63%}
 .room-bedroom{--baby-center:55%;--baby-floor:32%}
 .room-bathroom{--baby-center:53%;--baby-floor:29%}
-.room-garden{--baby-center:76%;--baby-floor:24%}
+.room-garden{--baby-center:60%;--baby-floor:24%;--baby-viewport:70%}
 #scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
 #jerryBaby3D{
  position:absolute;z-index:2;left:calc(var(--baby-center) - var(--baby-viewport, 37%) / 2);width:var(--baby-viewport, 37%);height:18.3%;
@@ -286,3 +286,5 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 }
 #jerryBaby3D[hidden]{display:none}
 #scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible}
+
+.room-garden:has(> #scene.jerry-baby-3d-ready){background-image:url("./assets/rooms/Garden-Baby.webp")}

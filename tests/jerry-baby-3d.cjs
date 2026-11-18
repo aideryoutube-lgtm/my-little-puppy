@@ -76,7 +76,7 @@ test('3D Baby follows room changes and keeps the still on renderer failure', asy
   assert.equal(shown(), false);
 });
 
-test('Animated Baby has a weighted skin, blink morph and the original plus feeding clips', () => {
+test('Animated Baby has a weighted skin, blink morph and all care clips', () => {
   const file = fs.readFileSync(path.join(root, 'assets/models/Jerry_Baby_Animated.glb'));
   const gltf = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
   assert.equal(file.readUInt32LE(8), file.length);
@@ -87,7 +87,11 @@ test('Animated Baby has a weighted skin, blink morph and the original plus feedi
       gltf.accessors[mesh.attributes.POSITION].count);
   }
   assert.equal(mesh.targets.length, 1);
-  assert.deepEqual(gltf.animations.map(clip => clip.name), ['Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome']);
+  assert.deepEqual(gltf.animations.map(clip => clip.name), [
+    'Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome',
+    'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome',
+    'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome',
+  ]);
   assert(gltf.animations[1].channels.some(channel =>
     channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
 });
@@ -125,7 +129,7 @@ test('Touch interrupts Walk once and Happy ends in Idle', async t => {
   assert.deepEqual(played, [['Idle', undefined], ['Walk', 1], ['Happy', 1], ['Idle', undefined]]);
 });
 
-test('Feed clips share the existing skeleton, match their root poses and animate the muzzle', () => {
+test('Care clips share the skeleton and preserve the root and prop positions at transitions', () => {
   const file = fs.readFileSync(path.join(root, 'assets/models/Jerry_Baby_Animated.glb'));
   const length = file.readUInt32LE(12);
   const gltf = JSON.parse(file.toString('utf8', 20, 20 + length));
@@ -138,7 +142,7 @@ test('Feed clips share the existing skeleton, match their root poses and animate
     assert(channel, clip + ' must animate ' + gltf.nodes[node].name + ' ' + channelPath);
     const accessor = gltf.accessors[animation.samplers[channel.sampler].output];
     const view = gltf.bufferViews[accessor.bufferView];
-    const width = { VEC3: 3, VEC4: 4 }[accessor.type];
+    const width = { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type];
     const start = 28 + length + (view.byteOffset || 0) + (accessor.byteOffset || 0);
     return Array.from({length: accessor.count}, (_, frame) =>
       Array.from({length: width}, (_, axis) => file.readFloatLE(start + (frame * width + axis) * 4)));
@@ -163,6 +167,30 @@ test('Feed clips share the existing skeleton, match their root poses and animate
       assert(Math.max(...heights) - Math.min(...heights) > .05);
     }
   }
+  for (const sequence of [
+    ['Idle', 'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome', 'Idle'],
+    ['Idle', 'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome', 'Idle'],
+  ]) {
+    const positions = sequence.map(name => samples(name, ground, 'translation'));
+    for (let i = 1; i < positions.length; i++) {
+      assert.deepEqual(positions[i - 1].at(-1), positions[i][0]);
+    }
+  }
+  assert(samples('Sleep', 0, 'weights').every(([weight]) => weight === 1));
+  const breath = samples('Sleep', named.Torso, 'translation');
+  assert(breath.some(([, height]) => height > breath[0][1]));
+  assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0]);
+
+  const ball = named['Beach ball'];
+  assert(!gltf.skins[0].joints.includes(ball));
+  assert(gltf.scenes[0].nodes.includes(ball));
+  assert.deepEqual(gltf.nodes[ball].scale, [0, 0, 0]);
+  const rolls = ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']
+    .map(name => samples(name, ball, 'translation'));
+  for (let i = 1; i < rolls.length; i++) assert.deepEqual(rolls[i - 1].at(-1), rolls[i][0]);
+  assert.notDeepEqual(rolls[1][0], rolls[1].at(-1));
+  assert.notDeepEqual(rolls[2][0], rolls[2].at(-1));
+  assert.deepEqual(samples('PlayWalkHome', ball, 'scale').at(-1), [0, 0, 0]);
 });
 
 test('Feed goes to the kitchen, blends through Eat, returns home and cancels on manual room change', async t => {
@@ -219,3 +247,48 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
   assert.equal(viewer.animationName, 'Idle');
   assert.deepEqual(visits, ['kitchen', 'garden', 'kitchen']);
 });
+
+
+for (const [action, room, clips] of [
+  ['sleep', 'bedroom', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
+  ['play', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
+]) {
+  test(action + ' visits the correct room and completes before restoring the original room', async t => {
+    const { window } = new JSDOM(
+      '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"></div></div>',
+      { runScripts: 'outside-only', pretendToBeVisual: true },
+    );
+    t.after(() => window.close());
+    const canvas = window.document.getElementById('roomCanvas');
+    const scene = window.document.getElementById('scene');
+    const frames = [];
+    window.requestAnimationFrame = callback => frames.push(callback);
+    window.pawtopiaWorld = { commit(type, value) {
+      assert.equal(type, 'room');
+      canvas.className = 'room-' + value;
+      return { ok: true };
+    }};
+    Object.assign(window.HTMLElement.prototype, {
+      availableAnimations: ['Idle', ...clips],
+      duration: 4,
+      dismissPoster() {},
+      play() {},
+      pause() {},
+    });
+    window.eval(run);
+    const viewer = window.document.getElementById('jerryBaby3D');
+    viewer.dispatchEvent(new window.Event('load'));
+    await settle();
+    scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action } }));
+    await settle();
+    for (const clip of clips) {
+      assert.equal(canvas.className, 'room-' + room);
+      assert.equal(viewer.animationName, clip);
+      viewer.currentTime = 3.7;
+      frames.shift()();
+      await settle();
+    }
+    assert.equal(canvas.className, 'room-living');
+    assert.equal(viewer.animationName, 'Idle');
+  });
+}

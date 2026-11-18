@@ -7,10 +7,16 @@ let failed = false;
 let clip = '';
 let walkTimer;
 let currentRoom = '';
-let pendingFeed = false;
-let feeding = false;
+let pendingAction;
+let sequence;
 let returnRoom;
-const feedNext = { WalkToBowl: 'Eat', Eat: 'WalkHome' };
+const careActions = {
+  feed: { room: 'kitchen', route: [.35, .91, .61, .77], clips: ['WalkToBowl', 'Eat', 'WalkHome'] },
+  sleep: { room: 'bedroom', route: [.38, .81, .52, .74],
+    clips: ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome'] },
+  play: { room: 'garden', route: [.42, .98, .59, .81],
+    clips: ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome'] }
+};
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
 
 let playbackRequest = 0;
@@ -22,16 +28,16 @@ async function play(name) {
   // The renderer applies animationName asynchronously with its default loop mode.
   await target.updateComplete;
   if (request !== playbackRequest || viewer !== target || target.hidden || document.hidden) return;
-  const feedClip = feeding && name !== 'Idle';
-  if (feedClip) target.currentTime = 0;
-  target.play(name === 'Idle' || feedClip ? {} : { repetitions: 1, pingpong: false });
+  const sequenceClip = Boolean(sequence && name !== 'Idle');
+  if (sequenceClip) target.currentTime = 0;
+  target.play(name === 'Idle' || sequenceClip ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
-  if (feedClip) {
+  if (sequenceClip) {
     // Hold each end pose in the GLB and transition while the mixer is live.
     // A one-shot finished event pauses model-viewer before it can crossfade.
     let previousTime = 0;
     function blendAtEnd() {
-      if (request !== playbackRequest || viewer !== target || !feeding) return;
+      if (request !== playbackRequest || viewer !== target || !sequence) return;
       const time = target.currentTime;
       if (target.duration > 0 && (time >= target.duration - .36 || time < previousTime)) {
         finished();
@@ -71,46 +77,48 @@ function canWalk() {
     floor - box.height * .38, floor + box.height * .20);
 }
 
-function clearFeedRoute() {
+function clearCareRoute([left, right, top, bottom]) {
   const room = canvas.getBoundingClientRect();
-  return clearFloor(room.left + room.width * .35, room.left + room.width * .91,
-    room.top + room.height * .61, room.top + room.height * .77);
+  return clearFloor(room.left + room.width * left, room.left + room.width * right,
+    room.top + room.height * top, room.top + room.height * bottom);
 }
 
-function cancelFeed() {
-  pendingFeed = false;
-  feeding = false;
+function cancelCare() {
+  pendingAction = undefined;
+  sequence = undefined;
   returnRoom = undefined;
 }
 
-function startFeed() {
-  if (!pendingFeed || !ready || viewer.hidden || document.hidden || clip !== 'Idle') return;
-  pendingFeed = false;
-  if (motionReduced() || roomBlocked() || !viewer.availableAnimations?.includes('Eat')) return;
+function startCare() {
+  if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') return;
+  const action = careActions[pendingAction];
+  pendingAction = undefined;
+  if (motionReduced() || roomBlocked() ||
+      !action.clips.every(name => viewer.availableAnimations?.includes(name))) return;
   const origin = currentRoom;
-  if (origin !== 'room-kitchen') {
-    if (!origin || !window.pawtopiaWorld?.commit('room', 'kitchen').ok) return;
+  if (origin !== 'room-' + action.room) {
+    if (!origin || !window.pawtopiaWorld?.commit('room', action.room).ok) return;
     returnRoom = origin.slice('room-'.length);
   }
-  // Read the authored floor area after the kitchen and its decor are rendered.
-  if (!clearFeedRoute()) {
+  if (!clearCareRoute(action.route)) {
     if (returnRoom) window.pawtopiaWorld.commit('room', returnRoom);
-    cancelFeed();
+    cancelCare();
     return;
   }
   clearTimeout(walkTimer);
-  feeding = true;
-  play('WalkToBowl');
+  sequence = action;
+  play(action.clips[0]);
 }
 
 function finished() {
-  if (feeding && feedNext[clip]) {
-    play(feedNext[clip]);
-    return;
-  }
-  if (feeding && clip === 'WalkHome') {
+  if (sequence) {
+    const next = sequence.clips[sequence.clips.indexOf(clip) + 1];
+    if (next) {
+      play(next);
+      return;
+    }
     const origin = returnRoom;
-    cancelFeed();
+    cancelCare();
     if (origin) window.pawtopiaWorld.commit('room', origin);
   }
   if (clip !== 'Idle') idle();
@@ -119,8 +127,8 @@ function finished() {
 function idle() {
   clearTimeout(walkTimer);
   play('Idle');
-  startFeed();
-  if (feeding || motionReduced()) return;
+  startCare();
+  if (sequence || motionReduced()) return;
   walkTimer = setTimeout(function stroll() {
     if (!viewer || viewer.hidden || document.hidden || clip !== 'Idle') return;
     if (canWalk()) play('Walk');
@@ -136,7 +144,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=3',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=4',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -159,7 +167,7 @@ function sync() {
       clearTimeout(walkTimer);
       failed = true;
       ready = false;
-      cancelFeed();
+      cancelCare();
       viewer.remove();
       viewer = undefined;
       sync();
@@ -169,12 +177,12 @@ function sync() {
   if (viewer) {
     const room = [...canvas.classList].find(name => /^room-(living|kitchen|bedroom|bathroom|garden)$/.test(name));
     const changed = viewer.hidden === show || currentRoom !== room;
-    // The Feed request itself may switch rooms before MutationObserver runs.
-    const enteringKitchen = feeding && returnRoom && room === 'room-kitchen';
+    // A care request can switch rooms before MutationObserver runs.
+    const enteringCareRoom = sequence && returnRoom && room === 'room-' + sequence.room;
     currentRoom = room;
     viewer.hidden = !show;
-    if (ready && clip && changed && !(show && enteringKitchen)) {
-      cancelFeed();
+    if (ready && clip && changed && !(show && enteringCareRoom)) {
+      cancelCare();
       if (show) idle();
       else {
         clearTimeout(walkTimer);
@@ -186,21 +194,22 @@ function sync() {
 }
 
 scene.addEventListener('pawtopia-jerry-action', event => {
-  if (event.detail.action === 'feed' && scene.dataset.growthStage === 'Baby') {
-    if (failed || feeding || motionReduced()) return;
-    pendingFeed = true;
-    startFeed();
+  const { action } = event.detail;
+  if (Object.hasOwn(careActions, action) && scene.dataset.growthStage === 'Baby') {
+    if (failed || sequence || motionReduced()) return;
+    pendingAction = action;
+    startCare();
     return;
   }
-  if (event.detail.action !== 'touch' || !ready || viewer.hidden || !clip ||
-      feeding || clip === 'Happy' || motionReduced()) return;
+  if (action !== 'touch' || !ready || viewer.hidden || !clip ||
+      sequence || clip === 'Happy' || motionReduced()) return;
   clearTimeout(walkTimer);
   play('Happy');
 });
 
 function syncMotion() {
   if (ready && viewer && !viewer.hidden && clip) {
-    cancelFeed();
+    cancelCare();
     idle();
   }
 }
@@ -208,7 +217,7 @@ reducedMotion?.addEventListener('change', syncMotion);
 document.addEventListener('visibilitychange', () => {
   if (!ready || !viewer || viewer.hidden || !clip) return;
   if (document.hidden) {
-    cancelFeed();
+    cancelCare();
     clearTimeout(walkTimer);
     viewer.pause();
   } else idle();

@@ -283,48 +283,57 @@ reach = strides * stride
 turn_time = .48
 
 
-def kitchen_pose(distance, heading):
+def route_pose(distance, heading, route_heading):
     data = frame()
-    offset(data, root, dx=distance * math.sin(bowl_heading),
-           dz=distance * math.cos(bowl_heading))
+    offset(data, root, dx=distance * math.sin(route_heading),
+           dz=distance * math.cos(route_heading))
     data[root, 'rotation'] = quaternion(1, heading)
     return data
 
 
-def kitchen_walk(t, home=False):
+def route_walk(t, home=False, *, route_heading=bowl_heading, start=0,
+               distance=reach, stride_length=stride, step_period=period, kitchen=False):
+    route_end = start + distance
+    travel = distance * step_period / stride_length
     # Take little steps during turns, then match planted-paw speed to root
     # motion during the straight section, using the existing Walk gait.
-    initial = bowl_heading if home else 0
-    heading = bowl_heading + math.pi if home else bowl_heading
+    initial = route_heading if home or start else 0
+    heading = route_heading - math.copysign(math.pi, route_heading) if home else route_heading
+    if kitchen and home:
+        heading = route_heading + math.pi
     direction = -1 if home else 1
-    start = reach if home else 0
+    origin = route_end if home else start
     if t < turn_time:
         phase = t / turn_time
-        data = kitchen_pose(start, initial + (heading - initial) * smooth(phase))
+        data = route_pose(origin, initial + (heading - initial) * smooth(phase), route_heading)
         effort = smooth(t / .09) * smooth((turn_time - t) / .09)
-        walk_steps(data, t, turn_time, stride, 0, True, effort)
+        walk_steps(data, t, turn_time, stride_length, 0, True, effort)
         return data
     t -= turn_time
-    distance = start + direction * min(reach, t * stride / period)
-    if t > travel_time:
-        elapsed = t - travel_time
-        end_heading = math.tau if home else bowl_heading
-        data = kitchen_pose(distance, heading + (end_heading - heading) * smooth(elapsed / turn_time))
+    position = origin + direction * min(distance, t * stride_length / step_period)
+    if t > travel:
+        elapsed = t - travel
+        end_heading = (math.tau if kitchen else 0) if home else route_heading
+        data = route_pose(position, heading + (end_heading - heading) * smooth(elapsed / turn_time), route_heading)
         if home:
             effort = smooth(elapsed / .09) * smooth((turn_time - elapsed) / .09)
-            walk_steps(data, elapsed, turn_time, stride, 0, True, effort)
+            walk_steps(data, elapsed, turn_time, stride_length, 0, True, effort)
         return data
-    data = kitchen_pose(distance, heading)
-    effort = smooth(t / .09) * smooth((travel_time - t) / .09)
-    bob = .012 * effort * math.sin(math.tau * 2 * t / period)
+    data = route_pose(position, heading, route_heading)
+    effort = smooth(t / .09) * smooth((travel - t) / .09)
+    bob = .012 * effort * math.sin(math.tau * 2 * t / step_period)
     offset(data, body, dy=bob)
-    walk_steps(data, t, period, stride, bob, False, effort)
-    data[tail, 'rotation'] = quaternion(1, .24 * effort * math.sin(math.tau * t / period))
+    walk_steps(data, t, step_period, stride_length, bob, False, effort)
+    data[tail, 'rotation'] = quaternion(1, .24 * effort * math.sin(math.tau * t / step_period))
     return data
 
 
+def kitchen_walk(t, home=False):
+    return route_walk(t, home, kitchen=True)
+
+
 def eat(t):
-    data = kitchen_pose(reach, bowl_heading)
+    data = route_pose(reach, bowl_heading, bowl_heading)
     lowering = smooth(t / .65) * (1 - smooth((t - 2.2) / .65))
     chewing = lowering * (math.sin(math.tau * 2.7 * t) + 1) / 2
     lick = max(0, math.sin(math.pi * np.clip((t - 2.77) / .40, 0, 1)))**2
@@ -338,6 +347,112 @@ def eat(t):
     return data
 
 
+# The bedroom rug serves as a floor-level sleeping spot, in front of the bed.
+bed_heading = 1.68
+bed_distance = .55
+ball_heading = math.radians(120)
+ball_approach = .32
+chase_distance = .76
+ball_gap = .75
+ball_radius = .20
+
+
+def add_ball():
+    # A separate, unskinned prop with colored beach-ball panels.
+    vertices, normals, colors = [], [], []
+    palette = [(1, .63, .01), (.88, .07, .12), (.06, .32, .89), (1, .84, .18)]
+    rings, slices = 12, 24
+
+    def point(ring, side, color):
+        polar, azimuth = math.pi * ring / rings, math.tau * side / slices
+        normal = (math.sin(polar) * math.cos(azimuth), math.cos(polar),
+                  math.sin(polar) * math.sin(azimuth))
+        vertices.append(tuple(component * ball_radius for component in normal))
+        normals.append(normal)
+        colors.append(color)
+
+    for ring in range(rings):
+        for side in range(slices):
+            color = palette[(side // (slices // len(palette))) % len(palette)]
+            for row, column in ((ring, side), (ring, side + 1), (ring + 1, side),
+                                (ring + 1, side), (ring, side + 1), (ring + 1, side + 1)):
+                point(row, column, color)
+    material = len(gltf['materials'])
+    gltf['materials'].append(dict(name='Beach ball', doubleSided=True,
+                                 pbrMetallicRoughness=dict(metallicFactor=0, roughnessFactor=.43)))
+    mesh = len(gltf['meshes'])
+    gltf['meshes'].append(dict(name='Beach ball', primitives=[dict(
+        attributes=dict(POSITION=add_accessor(vertices, 'VEC3', bounds=True),
+                        NORMAL=add_accessor(normals, 'VEC3'),
+                        COLOR_0=add_accessor(colors, 'VEC3')), material=material)]))
+    node = len(nodes)
+    nodes.append(dict(name='Beach ball', mesh=mesh, scale=[0, 0, 0]))
+    gltf['scenes'][0]['nodes'].append(node)
+    return node
+
+
+def sleep_pose(amount, closed, breath=0, stretch=0):
+    data = route_pose(bed_distance, bed_heading, bed_heading)
+    drop = .29 * amount
+    offset(data, body, dy=-drop + breath)
+    for index, (upper, paw) in enumerate(legs):
+        front = index < 2
+        reach_forward = (.24 if front else .10) * amount + (.18 * stretch if front else 0)
+        offset(data, upper, dy=drop * .52 - breath, dz=reach_forward * .40)
+        offset(data, paw, dy=drop * .48, dz=reach_forward * .60)
+    data[neck, 'rotation'] = quaternion(0, .31 * amount - .13 * stretch)
+    data[head, 'rotation'] = quaternion(0, .24 * amount - .21 * stretch)
+    data[tail, 'rotation'] = quaternion(0, -.28 * amount)
+    data[0, 'weights'] = closed
+    return data
+
+
+def ball_pose(data, roll=0, visible=1):
+    position = ball_approach + ball_gap + roll
+    dx, dz = math.sin(ball_heading), math.cos(ball_heading)
+    data[ball, 'translation'] = [dx * position, -.93 + ball_radius, dz * position]
+    half_angle = roll / (2 * ball_radius)
+    data[ball, 'rotation'] = [dz * math.sin(half_angle), 0,
+                              -dx * math.sin(half_angle), math.cos(half_angle)]
+    data[ball, 'scale'] = [visible] * 3
+    return data
+
+
+def push_ball(t):
+    contact = smooth(t / .48) * (1 - smooth((t - .49) / .45))
+    data = route_pose(ball_approach, ball_heading, ball_heading)
+    data[neck, 'rotation'] = quaternion(0, .76 * contact)
+    data[head, 'rotation'] = quaternion(0, .42 * contact)
+    return ball_pose(data, .19 * smooth((t - .43) / .5))
+
+
+def chase_ball(t):
+    phase = min(t / 1.05, 1)
+    position = ball_approach + chase_distance * phase
+    data = route_pose(position, ball_heading, ball_heading)
+    effort = smooth(t / .10) * smooth((1.05 - t) / .12)
+    bob = .04 * effort * math.sin(math.tau * t / .35)**2
+    offset(data, body, dy=bob)
+    walk_steps(data, t, .35, chase_distance / 3, bob, False, effort)
+    return ball_pose(data, .19 + chase_distance * (1 - (1 - phase)**1.6))
+
+
+def ball_happy(t):
+    data = happy(min(t, 1.5))
+    position = ball_approach + chase_distance
+    offset(data, root, dx=position * math.sin(ball_heading), dz=position * math.cos(ball_heading))
+    data[root, 'rotation'] = quaternion(1, ball_heading)
+    return ball_pose(data, .19 + chase_distance)
+
+
+def play_home(t):
+    data = route_walk(t, home=True, route_heading=ball_heading,
+                      distance=ball_approach + chase_distance)
+    travel = (ball_approach + chase_distance) * period / stride
+    return ball_pose(data, .19 + chase_distance,
+                     1 - smooth((t - 2 * turn_time - travel + .31) / .30))
+
+
 clip('Idle', 6, idle)
 clip('Walk', 4.72, walk)
 clip('Happy', 1.5, happy)
@@ -349,6 +464,26 @@ clip('WalkToBowl', turn_time + travel_time + blend_hold, kitchen_walk)
 clip('Eat', 3.85 + blend_hold, eat)
 clip('WalkHome', 2 * turn_time + travel_time + blend_hold,
      lambda t: kitchen_walk(min(t, 2 * turn_time + travel_time), home=True))
+ball = add_ball()
+clip('WalkToBed', turn_time + bed_distance * period / stride + blend_hold,
+     lambda t: route_walk(t, route_heading=bed_heading, distance=bed_distance))
+clip('LieDown', 1.05 + blend_hold,
+     lambda t: sleep_pose(smooth(t / 1.05), smooth((t - .46) / .52)))
+clip('Sleep', 3.6 + blend_hold,
+     lambda t: sleep_pose(1, 1, .012 * math.sin(math.tau * min(t, 3.6) / 1.8)))
+clip('WakeUp', 1.65 + blend_hold,
+     lambda t: sleep_pose(1 - smooth((t - .37) / .93), 1 - smooth(t / .45),
+                          stretch=smooth((t - .44) / .38) * (1 - smooth((t - .90) / .63))))
+clip('SleepWalkHome', 2 * turn_time + bed_distance * period / stride + blend_hold,
+     lambda t: route_walk(t, home=True, route_heading=bed_heading, distance=bed_distance))
+clip('WalkToBall', turn_time + ball_approach * period / stride + blend_hold,
+     lambda t: ball_pose(route_walk(t, route_heading=ball_heading, distance=ball_approach),
+                         visible=smooth(t / .28)))
+clip('PushBall', .96 + blend_hold, push_ball)
+clip('ChaseBall', 1.05 + blend_hold, chase_ball)
+clip('PlayHappy', 1.5 + blend_hold, ball_happy)
+clip('PlayWalkHome', 2 * turn_time + (ball_approach + chase_distance) * period / stride + blend_hold,
+     play_home)
 gltf['buffers'][0]['byteLength'] = len(binary)
 metadata = json.dumps(gltf, separators=(',', ':')).encode()
 metadata += b' ' * (-len(metadata) % 4)
