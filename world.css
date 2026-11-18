@@ -281,8 +281,3 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 }
 #jerryBaby3D[hidden]{display:none}
 #scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible}
-@media (prefers-reduced-motion:no-preference){
- #scene.jerry-baby-3d-ready #jerryBaby3D{animation:jerry-baby-breathe 3.8s ease-in-out infinite alternate}
-}
-html[data-effects=minimal] #scene.jerry-baby-3d-ready #jerryBaby3D{animation:none}
-@keyframes jerry-baby-breathe{from{transform:scaleY(1)}to{transform:scaleY(1.018)}}

@@ -75,3 +75,52 @@ test('3D Baby follows room changes and keeps the still on renderer failure', asy
   assert.equal(doc.getElementById('jerryBaby3D'), null);
   assert.equal(shown(), false);
 });
+
+test('Animated Baby has a weighted skin, blink morph and three embedded clips', () => {
+  const file = fs.readFileSync(path.join(root, 'assets/models/Jerry_Baby_Animated.glb'));
+  const gltf = JSON.parse(file.toString('utf8', 20, 20 + file.readUInt32LE(12)));
+  assert.equal(file.readUInt32LE(8), file.length);
+  assert.equal(gltf.skins[0].joints.length, 15);
+  const mesh = gltf.meshes[0].primitives[0];
+  for (const key of ['JOINTS_0', 'WEIGHTS_0']) {
+    assert.equal(gltf.accessors[mesh.attributes[key]].count,
+      gltf.accessors[mesh.attributes.POSITION].count);
+  }
+  assert.equal(mesh.targets.length, 1);
+  assert.deepEqual(gltf.animations.map(clip => clip.name), ['Idle', 'Walk', 'Happy']);
+  assert(gltf.animations[1].channels.some(channel =>
+    channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
+});
+
+test('Touch interrupts Walk once and Happy ends in Idle', async t => {
+  const { window } = new JSDOM(
+    '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"></div></div>' +
+    '<div id="worldOverlay" hidden></div><div id="miniOverlay" hidden></div>',
+    { runScripts: 'outside-only', pretendToBeVisual: true },
+  );
+  t.after(() => window.close());
+  const played = [];
+  let stroll;
+  window.setTimeout = callback => { stroll = callback; return 1; };
+  window.clearTimeout = () => {};
+  Object.assign(window.HTMLElement.prototype, {
+    availableAnimations: ['Idle', 'Walk', 'Happy'],
+    play(options) { played.push([this.animationName, options.repetitions]); },
+    dismissPoster() {},
+    pause() {},
+  });
+  window.eval(run);
+  const viewer = window.document.getElementById('jerryBaby3D');
+  const scene = window.document.getElementById('scene');
+  viewer.dispatchEvent(new window.Event('load'));
+  await settle();
+  stroll();
+  await settle();
+  for (let tap = 0; tap < 2; tap++) {
+    scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action: 'touch' } }));
+  }
+  await settle();
+  viewer.dispatchEvent(new window.Event('finished'));
+  await settle();
+  assert.deepEqual(played, [['Idle', undefined], ['Walk', 1], ['Happy', 1], ['Idle', undefined]]);
+});
