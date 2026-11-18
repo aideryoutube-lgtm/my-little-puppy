@@ -1,6 +1,7 @@
-/* Temporary, read-only mobile diagnostic for Baby 3D loading. */
+/* Read-only Baby 3D diagnostics enabled with ?debugBaby3D=1. */
 (() => {
   'use strict';
+  if (new URLSearchParams(location.search).get('debugBaby3D') !== '1') return;
   const box = document.createElement('div');
   box.id = 'baby3dDiagnostic';
   box.setAttribute('role', 'status');
