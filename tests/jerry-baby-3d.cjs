@@ -32,7 +32,7 @@ test('Baby GLB is self-contained with indexed geometry and three embedded textur
   assert.equal(gltf.animations, undefined);
 });
 
-test('3D Baby follows room changes, yields to videos and keeps the still on renderer failure', async t => {
+test('3D Baby follows room changes and keeps the still on renderer failure', async t => {
   const { window } = new JSDOM(
     '<section id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Puppy"></div></section>',
     { runScripts: 'outside-only' },
@@ -59,12 +59,6 @@ test('3D Baby follows room changes, yields to videos and keeps the still on rend
     assert.equal(room.querySelector('#jerryBaby3D'), viewer);
     assert(shown());
   }
-  scene.classList.add('video-ready');
-  await settle();
-  assert(viewer.hidden && !shown());
-  scene.classList.remove('video-ready');
-  await settle();
-  assert(!viewer.hidden && shown());
   scene.dataset.growthStage = 'Adult';
   await settle();
   assert(viewer.hidden && !shown());

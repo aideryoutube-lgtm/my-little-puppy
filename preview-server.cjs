@@ -8,7 +8,7 @@ const root=__dirname;
 const username=process.env.PREVIEW_USER;
 const password=process.env.PREVIEW_PASSWORD;
 if(!username||!password||password.length<12){console.error('PREVIEW_USER and PREVIEW_PASSWORD (12+ chars) are required');process.exit(1);}
-const types={'.glb':'model/gltf-binary','.txt':'text/plain; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.mp4':'video/mp4','.mov':'video/quicktime','.json':'application/json','.ico':'image/x-icon','.woff2':'font/woff2','.mp3':'audio/mpeg'};
+const types={'.glb':'model/gltf-binary','.txt':'text/plain; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.svg':'image/svg+xml','.json':'application/json','.ico':'image/x-icon','.woff2':'font/woff2','.mp3':'audio/mpeg'};
 function safeEqual(a,b){const aa=Buffer.from(a),bb=Buffer.from(b);return aa.length===bb.length&&crypto.timingSafeEqual(aa,bb);}
 function sendFile(target,res,options){const stream=fs.createReadStream(target,options);stream.on('error',()=>res.destroy());res.on('close',()=>stream.destroy());stream.pipe(res);}
 http.createServer((req,res)=>{

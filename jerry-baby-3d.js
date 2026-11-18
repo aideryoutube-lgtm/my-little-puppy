@@ -7,8 +7,7 @@ let failed = false;
 
 function sync() {
   const isBaby = scene.dataset.growthStage === 'Baby';
-  const show = isBaby && !canvas.classList.contains('jerry-3d-ready') &&
-    !scene.classList.contains('video-ready');
+  const show = isBaby && !canvas.classList.contains('jerry-3d-ready');
   if (show && !viewer && !failed) {
     viewer = document.createElement('model-viewer');
     viewer.id = 'jerryBaby3D';
