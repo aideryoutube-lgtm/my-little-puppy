@@ -136,13 +136,18 @@ function cancelCare() {
   returnRoom = undefined;
 }
 
+function careDebug(message) {
+  window.dispatchEvent(new CustomEvent('baby-care-debug', {detail: String(message)}));
+}
 function startCare() {
-  if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') return;
+  careDebug('start: ' + (pendingAction || 'none') + ', room=' + currentRoom + ', clip=' + clip);
+  if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') { careDebug('start blocked: pending=' + pendingAction + ', ready=' + ready + ', hidden=' + viewer.hidden + ', clip=' + clip); return; }
   const request = pendingAction;
   const action = careActions[request];
   if ((request === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) ||
       motionReduced() || roomBlocked() ||
       !action.clips.every(name => viewer.availableAnimations?.includes(name))) {
+    careDebug('action rejected: ' + request + ', missing clips=' + action.clips.filter(name => !viewer.availableAnimations?.includes(name)).join(',') + ', roomBlocked=' + roomBlocked() + ', reducedMotion=' + motionReduced());
     cancelCare();
     return;
   }
@@ -156,9 +161,10 @@ function startCare() {
     // Previously it was cleared before commit(), so the room observer
     // cancelled the action without ever playing the first clip.
     returnRoom = origin.slice('room-'.length);
+    careDebug('room switch requested: ' + action.room);
     return;
   }
-  if (!clearCareRoute(action.route)) {
+  if (!clearCareRoute(action.route)) { careDebug('care route blocked: ' + request);
     if (returnRoom) window.pawtopiaWorld.commit('room', returnRoom);
     cancelCare();
     return;
@@ -167,6 +173,7 @@ function startCare() {
   clearTimeout(walkTimer);
   sequence = action;
   lockCare(true);
+  careDebug('playing ' + action.clips[0]);
   play(action.clips[0]);
 }
 
@@ -273,6 +280,7 @@ function sync() {
 
 scene.addEventListener('pawtopia-jerry-action', event => {
   const { action } = event.detail;
+  careDebug('button: ' + action + ', stage=' + scene.dataset.growthStage);
   if (Object.hasOwn(careActions, action) && scene.dataset.growthStage === 'Baby') {
     if (failed || sequence || pendingAction || clip === 'DressTurn' || motionReduced()) return;
     if (action === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) return;
