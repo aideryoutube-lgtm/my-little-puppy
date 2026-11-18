@@ -60,7 +60,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=2',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',

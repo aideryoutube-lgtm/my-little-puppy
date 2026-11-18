@@ -167,6 +167,7 @@ def idle(t):
     for upper, _ in legs:
         offset(data, upper, dy=-breath)
     data[head, 'rotation'] = quaternion(1, .11 * math.sin(math.tau * t / 6))
+    data[tail, 'rotation'] = quaternion(1, .12 * math.sin(math.tau * t / 3))
     for i, ear in enumerate(ears):
         twitch = max(0, 1 - abs(t - 3.3 - i * .23) / .23)
         data[ear, 'rotation'] = quaternion(2, (-1)**i * .17 * twitch)
