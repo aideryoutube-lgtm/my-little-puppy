@@ -6,7 +6,7 @@ const { join } = require('node:path');
 
 const actions = [
   ['#food', ['WalkToBowl', 'Eat', 'WalkHome']],
-  ['#sleep', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
+  ['#sleep', ['ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome']],
   ['#bath', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
   ['#ball', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
   ['#home', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome']],
@@ -105,7 +105,7 @@ async function main() {
         const model = document.getElementById('jerryBaby3D');
         return model.animationName === 'Idle' && !document.getElementById('scene').hasAttribute('data-care-busy');
       }, null, { timeout: 8000 });
-      assert.equal(await page.locator(`[data-room="${button === '#food' ? 'kitchen' : origin}"]`).getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator(`[data-room="${button === '#food' ? 'kitchen' : button === '#sleep' ? 'bedroom' : origin}"]`).getAttribute('aria-pressed'), 'true');
       console.log(button, 'advanced through all clips and returned to Idle');
     }
     const before = await page.evaluate(() => window.pawtopiaWorld.snapshot());

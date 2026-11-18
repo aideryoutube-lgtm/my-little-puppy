@@ -276,7 +276,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 /* Baby-only anchors use coordinates on the floor of each room artwork. */
 .room-living{--baby-center:53%;--baby-floor:38%}
 .room-kitchen{--baby-center:50%;--baby-floor:26%;--baby-viewport:63%}
-.room-bedroom{--baby-center:55%;--baby-floor:32%}
+.room-bedroom{--baby-center:39%;--baby-floor:32%;--baby-viewport:65%}
 .room-bathroom{--baby-center:53%;--baby-floor:29%;--baby-viewport:65%}
 .room-garden{--baby-center:60%;--baby-floor:24%;--baby-viewport:70%}
 #scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
@@ -287,6 +287,57 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 }
 #jerryBaby3D[hidden]{display:none}
 #scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible;opacity:1}
+
+/* Render at the bedroom's displayed size so the face stays sharp. */
+.room-bedroom #jerryBaby3D{
+ left:calc(var(--baby-center) - var(--baby-viewport) * .9375);
+ width:calc(var(--baby-viewport) * 1.875);height:34.3125%;
+ bottom:calc(var(--baby-floor) - 6.73875%);scale:1;
+}
+
+/* Align the jumping layer and the foreground bedspread to the same artwork. */
+.room-bedroom #scene.baby-bed-route #jerryBaby3D{
+ left:calc(var(--sleep-x) - var(--baby-viewport) * .9375);
+ top:calc(var(--sleep-y) - 27.58725%);bottom:auto;
+ scale:var(--sleep-scale);
+}
+#babyBedEdge,#babyMattressPressure,#babySleepDreams{display:none;position:absolute;pointer-events:none}
+.room-bedroom > #scene.baby-on-mattress #babyBedEdge{
+ display:block;inset:0;z-index:3;
+ background:url('./assets/rooms/Bedroom.png') center/contain no-repeat;
+ clip-path:polygon(51.5% 34.6%,56.4% 33.8%,65.5% 33.5%,77.2% 33.8%,83% 34.8%,
+  88.8% 34.6%,95.5% 34.3%,100% 35.1%,100% 49.3%,77% 47%,51% 43.8%);
+}
+.room-bedroom > #scene.baby-on-mattress #babyMattressPressure{
+ display:block;inset:0;z-index:1;
+}
+#babyMattressPressure::before,#babyMattressPressure::after{
+ content:'';position:absolute;inset:0;
+}
+#babyMattressPressure::before{
+ background:url('./assets/rooms/Bedroom.png') center/contain no-repeat;
+ transform:translateY(calc(.6% * var(--mattress-load)));
+ -webkit-mask-image:radial-gradient(ellipse 12% 1.6% at var(--sleep-x) 32.5%,black 15%,transparent);
+ mask-image:radial-gradient(ellipse 12% 1.6% at var(--sleep-x) 32.5%,black 15%,transparent);
+ opacity:var(--mattress-load);
+}
+#babyMattressPressure::after{
+ background:radial-gradient(ellipse 8.5% 1.2% at var(--sleep-x) var(--sleep-y),#20184d9e,transparent);
+ opacity:calc(.48 + .48 * var(--mattress-load));
+}
+.room-bedroom.night #babyBedEdge,.room-bedroom.night #babyMattressPressure::before{
+ background-color:#474978;background-blend-mode:multiply;
+}
+.room-bedroom > #scene.jerry-baby-3d-ready.baby-dreaming #babySleepDreams{
+ display:block;z-index:4;left:81%;top:25%;color:#fff4dc;
+ font-size:clamp(12px,4vw,20px);font-weight:800;text-shadow:0 1px 3px #60405b;
+ animation:baby-dreams 2.5s ease both;
+}
+@keyframes baby-dreams{
+ 0%{transform:translateY(6px);opacity:0}
+ 25%,67%{opacity:1}
+ 100%{transform:translateY(-12px);opacity:0}
+}
 
 .room-garden:has(> #scene.jerry-baby-3d-ready){background-image:url("./assets/rooms/Garden-Baby.webp")}
 

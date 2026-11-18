@@ -24,6 +24,66 @@ const feedTurn = .48;
 const feedWalk = 5 * .58; // Five planted-paw cycles in rig-jerry-baby.py.
 const feedArrival = feedTurn + feedWalk;
 const biteEnds = [1.21, 2.09, 2.97, 3.85];
+const sleepStates = {
+  ApproachBed: 'WalkingToBed', Crouch: 'PreparingToJump', JumpUp: 'Jumping',
+  LandOnMattress: 'Landing', SettleOnMattress: 'GettingComfortable',
+  LieDown: 'LyingDown', Sleep: 'Sleeping', WakeUp: 'WakingUp',
+  WalkToBedEdge: 'WalkingToEdge', JumpDown: 'JumpingDown', SleepWalkHome: 'WalkingHome'
+};
+
+// Fractions of Bedroom.png. Positions mark the surface between Jerry's paws.
+const bedroomStart = [.39, .6886875, 1];
+const bedTakeoff = [.64, .473, .77];
+const bedEdge = [.705, .330, .69];
+const bedCenter = [.758, .317, .65];
+
+function positionSleeping(name, time, duration) {
+  const progress = Math.max(0, Math.min(1, time / duration));
+  const fraction = (start, length) => Math.max(0, Math.min(1, (time - start) / length));
+  let from = bedCenter;
+  let to = bedCenter;
+  let travel = 0;
+  let lift = 0;
+  let compression = 0;
+  switch (name) {
+    case 'ApproachBed':
+      [from, to, travel] = [bedroomStart, bedTakeoff, fraction(.5, 2.8)];
+      break;
+    case 'Crouch':
+      from = to = bedTakeoff;
+      break;
+    case 'JumpUp':
+      [from, to, travel] = [bedTakeoff, bedEdge, progress];
+      lift = .115 * 4 * progress * (1 - progress);
+      break;
+    case 'LandOnMattress':
+      from = to = bedEdge;
+      compression = .006 * Math.sin(Math.PI * progress);
+      break;
+    case 'SettleOnMattress':
+      [from, to, travel] = [bedEdge, bedCenter, fraction(0, .85)];
+      break;
+    case 'WalkToBedEdge':
+      [from, to, travel] = [bedCenter, bedEdge, fraction(.52, .85)];
+      break;
+    case 'JumpDown':
+      [from, to, travel] = [bedEdge, bedTakeoff, progress];
+      lift = .095 * 4 * progress * (1 - progress);
+      break;
+    case 'SleepWalkHome':
+      [from, to, travel] = [bedTakeoff, bedroomStart, fraction(.26, 2.8)];
+      break;
+  }
+  const [x, y, size] = from.map((value, i) => value + (to[i] - value) * travel);
+  scene.style.setProperty('--sleep-x', `${x * 100}%`);
+  scene.style.setProperty('--sleep-y', `${(y - lift + compression) * 100}%`);
+  scene.style.setProperty('--sleep-scale', size);
+  scene.style.setProperty('--mattress-load', String(compression / .006));
+  scene.classList.add('baby-bed-route');
+  scene.classList.toggle('baby-on-mattress', ['LandOnMattress', 'SettleOnMattress',
+    'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge'].includes(name) ||
+    (name === 'JumpUp' && progress >= .88) || (name === 'JumpDown' && progress <= .12));
+}
 const feedStates = { WalkToBowl: 'WalkingToBowl', Eat: 'Eating', WalkHome: 'WalkingHome' };
 
 function makeFoodLayer() {
@@ -186,8 +246,8 @@ const careActions = {
     clips: ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'] },
   drink: { room: 'kitchen', route: [.44, .95, .71, .82],
     clips: ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'] },
-  sleep: { room: 'bedroom', route: [.38, .81, .52, .74],
-    clips: ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome'] },
+  sleep: { room: 'bedroom', route: [.22, .86, .28, .76],
+    clips: Object.keys(sleepStates) },
   play: { room: 'garden', route: [.42, .98, .59, .81],
     clips: ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome'] }
 };
@@ -198,6 +258,8 @@ async function play(name) {
   const request = ++playbackRequest;
   const target = viewer;
   clip = name;
+  const sleeping = care?.action === 'sleep' && name !== 'Idle';
+  target.animationCrossfadeDuration = sleeping ? 0 : 250;
   target.animationName = name;
   wetFur(name === 'BathShake' ? 1 : 0);
   // The renderer applies animationName asynchronously with its default loop mode.
@@ -207,12 +269,13 @@ async function play(name) {
   const feeding = sequenceClip && care.action === 'feed';
   if (feeding) positionFeeding(name, 0);
   if (sequenceClip) target.currentTime = 0;
-  target.play(name === 'Idle' || (sequenceClip && !feeding) ? {} : { repetitions: 1, pingpong: false });
+  target.play(name === 'Idle' || (sequenceClip && !feeding && !sleeping) ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
   if (care && !(target.duration > 0)) {
     stopCare('Renderer did not select clip ' + name, true);
     return;
   }
+  if (sleeping) positionSleeping(name, 0, target.duration);
   if (sequenceClip) {
     careDebug('clip started: ' + name);
     // Non-feed care clips keep the mixer live to preserve their crossfades.
@@ -236,9 +299,22 @@ async function play(name) {
         }
         return;
       }
+      if (sleeping) {
+        positionSleeping(name, time, target.duration);
+        scene.classList.toggle('baby-dreaming', name === 'Sleep' && time >= .65 && time < 3.15);
+        if (time >= target.duration) {
+          advanceCare();
+          return;
+        }
+        if (target.paused) {
+          lastProgressAt = timestamp;
+          window.requestAnimationFrame(blendAtEnd);
+          return;
+        }
+      }
       if (name === 'BathWash') wetFur(Math.min(1, time / .65));
       if (name === 'BathShake') wetFur(Math.max(0, Math.min(1, (1.55 - time) / .72)));
-      if (target.duration > 0 && (time >= target.duration - .36 || looped)) {
+      if (!sleeping && target.duration > 0 && (time >= target.duration - .36 || looped)) {
         advanceCare();
       } else {
         // model-viewer suspends its mixer when scrolled out of view.
@@ -302,6 +378,14 @@ function stopCare(reason, restoreRoom = false) {
   const origin = care?.origin;
   if (care) careDebug(care.action + ': ' + reason);
   const meal = care?.action === 'feed' && care;
+  const sleeping = care?.action === 'sleep';
+  if (sleeping) {
+    scene.classList.remove('baby-dreaming', 'baby-bed-route', 'baby-on-mattress');
+    for (const property of ['--sleep-x', '--sleep-y', '--sleep-scale', '--mattress-load']) {
+      scene.style.removeProperty(property);
+    }
+    careDebug('Idle');
+  }
   care = undefined;
   if (meal) {
     careDebug('Idle');
@@ -324,9 +408,9 @@ function playCareClip() {
   const index = care.index;
   const last = care.clips.length - 1;
   const name = care.clips[index];
-  care.state = care.action === 'feed' ? feedStates[name] :
-    last === 0 ? 'PerformingAction' : index === 0 ? 'Moving' :
-      index === last ? 'Returning' : 'PerformingAction';
+  care.state = care.action === 'feed' ? feedStates[name] : sleepStates[name] ??
+    (last === 0 ? 'PerformingAction' : index === 0 ? 'Moving' :
+      index === last ? 'Returning' : 'PerformingAction');
   careDebug(care.state + ': ' + name);
   play(name).catch(error => stopCare('Playback failed: ' + error.message, true));
 }
@@ -348,8 +432,10 @@ function advanceCare() {
   care.index++;
   if (care.index < care.clips.length) return playCareClip();
   const meal = care.action === 'feed' ? care : undefined;
-  stopCare('completed', !meal);
+  const sleep = care.action === 'sleep' ? care : undefined;
+  stopCare('completed', !meal && !sleep);
   meal?.finishMeal?.();
+  sleep?.finishSleep?.();
 }
 
 function finished() {
@@ -377,7 +463,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=7',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=9',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -416,6 +502,17 @@ function sync() {
     });
     scene.prepend(viewer);
     if (!foodLayer) makeFoodLayer();
+    const edge = document.createElement('div');
+    edge.id = 'babyBedEdge';
+    edge.setAttribute('aria-hidden', 'true');
+    const pressure = document.createElement('div');
+    pressure.id = 'babyMattressPressure';
+    pressure.setAttribute('aria-hidden', 'true');
+    const dreams = document.createElement('span');
+    dreams.id = 'babySleepDreams';
+    dreams.setAttribute('aria-hidden', 'true');
+    dreams.textContent = 'Zzz';
+    scene.prepend(edge, pressure, dreams);
   }
   if (viewer) {
     const room = roomName();
@@ -435,13 +532,13 @@ function sync() {
 }
 
 scene.addEventListener('pawtopia-jerry-action', event => {
-  const { action, finishMeal } = event.detail;
+  const { action, finishMeal, finishSleep } = event.detail;
   const origin = roomName();
   if (scene.dataset.growthStage !== 'Baby' || !origin) return;
   const config = Object.hasOwn(careActions, action) ? careActions[action] :
     action === 'dress-show' ? { room: origin, clips: ['DressTurn'] } : undefined;
   if (!config && action !== 'touch') return;
-  if (finishMeal && care) event.preventDefault();
+  if ((finishMeal || finishSleep) && care) event.preventDefault();
   if (failed || care || viewer?.hidden || motionReduced() || (action === 'feed' && foodFailed)) {
     careDebug('Ignored ' + action + ': ' + (care ? 'busy' : 'viewer or motion setting'));
     return;
@@ -464,9 +561,9 @@ scene.addEventListener('pawtopia-jerry-action', event => {
     careDebug('Ignored ' + action + ': room blocked');
     return;
   }
-  if (finishMeal) event.preventDefault();
+  if (finishMeal || finishSleep) event.preventDefault();
   clearTimeout(walkTimer);
-  care = { ...config, action, origin, finishMeal, index: 0, state: 'WaitingForRoom' };
+  care = { ...config, action, origin, finishMeal, finishSleep, index: 0, state: 'WaitingForRoom' };
   lockCare(true);
   careDebug('WaitingForRoom: ' + action + ' in ' + config.room);
   if (origin !== config.room) {

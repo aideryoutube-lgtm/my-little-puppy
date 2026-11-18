@@ -90,7 +90,7 @@ test('Animated Baby has a weighted skin, blink and chew morphs and all care clip
   assert.deepEqual(gltf.meshes[0].extras.targetNames, ['Blink', 'Chew']);
   assert.deepEqual(gltf.animations.map(clip => clip.name), [
     'Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome',
-    'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome',
+    'ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome',
     'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome',
     'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'DressTurn',
     'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome',
@@ -178,7 +178,7 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   }
   for (const sequence of [
     ['Idle', 'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'Idle'],
-    ['Idle', 'WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome', 'Idle'],
+    ['Idle', 'ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome', 'Idle'],
     ['Idle', 'WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome', 'Idle'],
     ['Idle', 'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome', 'Idle'],
     ['Idle', 'WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome', 'Idle'],
@@ -187,6 +187,27 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     for (let i = 1; i < positions.length; i++) {
       assert.deepEqual(positions[i - 1].at(-1), positions[i][0]);
     }
+  }
+  const front = named['Front Left paw'];
+  const hind = named['Hind Left paw'];
+  const pawHeight = (clip, side, end) => {
+    const limb = name => samples(clip, named[name], 'translation').at(end)[1];
+    return limb('Torso') + limb(side + ' Left upper leg') + limb(side + ' Left paw');
+  };
+  assert(pawHeight('JumpUp', 'Front', -1) - pawHeight('JumpUp', 'Hind', -1) < -.2);
+  assert(Math.abs(pawHeight('LandOnMattress', 'Front', -1) -
+    pawHeight('LandOnMattress', 'Hind', -1)) < .0001);
+  for (const paw of [front, hind]) {
+    const steps = samples('ApproachBed', paw, 'translation').map(([, height]) => height);
+    assert(Math.max(...steps) - Math.min(...steps) > .05);
+  }
+  assert(samples('Sleep', 0, 'weights').every(([blink, chew]) => blink === 1 && chew === 0));
+  assert.equal(samples('WakeUp', 0, 'weights').at(-1)[0], 0);
+  const lying = samples('LieDown', named.Torso, 'translation');
+  assert(lying[0][1] - lying.at(-1)[1] > .4);
+  for (const joint of ['Torso', 'Left ear', 'Right ear', 'Tail']) {
+    const rhythm = samples('Sleep', named[joint], joint === 'Torso' ? 'translation' : 'rotation');
+    assert(rhythm.some(frame => frame.some((axis, i) => Math.abs(axis - rhythm[0][i]) > .004)));
   }
   assert.notDeepEqual(samples('WalkToWater', ground, 'translation').at(-1), approach.at(-1));
   for (const [animation, node, property] of [
@@ -319,10 +340,10 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
 
 for (const [action, room, clips] of [
   ['care', 'bathroom', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
-  ['sleep', 'bedroom', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
+  ['sleep', 'bedroom', ['ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome']],
   ['play', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
 ]) {
-  test(action + ' visits the correct room and completes before restoring the original room', async t => {
+  test(action + ' completes its route in the correct room', async t => {
     const { window } = new JSDOM(
       '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"><button id="bath"></button></div></div>',
       { runScripts: 'outside-only', pretendToBeVisual: true },
@@ -362,6 +383,29 @@ for (const [action, room, clips] of [
       assert.equal(canvas.className, 'room-' + room);
       assert.equal(viewer.animationName, clip);
       assert(bathButton.disabled);
+      if (action === 'sleep') {
+        viewer.currentTime = clip === 'Sleep' ? 1 : viewer.duration - .05;
+        frames.shift()(1000);
+        assert.equal(viewer.animationName, clip);
+        assert.equal(scene.classList.contains('baby-dreaming'), clip === 'Sleep');
+        if (clip === 'Sleep') {
+          assert(scene.classList.contains('baby-on-mattress'));
+          assert.equal(scene.style.getPropertyValue('--sleep-y'), '31.7%');
+        }
+        if (clip === 'JumpUp') {
+          viewer.currentTime = viewer.duration / 2;
+          frames.shift()(1100);
+          assert(parseFloat(scene.style.getPropertyValue('--sleep-y')) < 31.7);
+          assert(!scene.classList.contains('baby-on-mattress'));
+        }
+        // A refresh and a paused frame preserve position and phase.
+        scene.classList.add('progress-saved');
+        await settle();
+        viewer.paused = true;
+        frames.shift()(9000);
+        viewer.paused = false;
+        assert.equal(viewer.animationName, clip);
+      }
       if (clip === 'BathWash') {
         viewer.currentTime = .8;
         frames.shift()();
@@ -369,13 +413,27 @@ for (const [action, room, clips] of [
         scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action: 'touch' } }));
         assert.equal(viewer.animationName, clip);
       }
-      viewer.currentTime = 3.7;
+      viewer.currentTime = action === 'sleep' ? viewer.duration : 3.7;
       frames.shift()();
       await settle();
     }
-    assert.equal(canvas.className, 'room-living');
+    assert.equal(canvas.className, action === 'sleep' ? 'room-bedroom' : 'room-living');
     assert.equal(viewer.animationName, 'Idle');
     assert.equal(bathButton.disabled, false);
+    assert(!scene.classList.contains('baby-dreaming'));
+    if (action === 'sleep') {
+      scene.dispatchEvent(new window.CustomEvent('pawtopia-jerry-action', { detail: { action } }));
+      await settle();
+      for (const clip of clips) {
+        assert.equal(viewer.animationName, clip);
+        viewer.currentTime = viewer.duration;
+        frames.shift()();
+        await settle();
+      }
+      assert.equal(viewer.animationName, 'Idle');
+      assert(!scene.classList.contains('baby-bed-route'));
+      assert.equal(scene.style.getPropertyValue('--sleep-y'), '');
+    }
     assert.equal(fur.baseColorFactor[0], 1);
     assert.equal(fur.roughnessFactor, 1);
   });
@@ -561,7 +619,7 @@ test('Real action buttons complete each care route from every permitted room', a
   }
   const actions = [
     ['#food', 'kitchen', ['WalkToBowl', 'Eat', 'WalkHome']],
-    ['#sleep', 'bedroom', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
+    ['#sleep', 'bedroom', ['ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome']],
     ['#bath', 'bathroom', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
     ['#ball', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
     ['#home', 'garden', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome']],
@@ -610,6 +668,7 @@ test('Real action buttons complete each care route from every permitted room', a
       }
       const saved = app.save();
       const isFeed = button === '#food';
+      const isSleep = button === '#sleep';
       const bowlLevel = () => Number($('#babyFoodBowl').dataset.foodLevel);
       $(button)?.click(); // Immediately repeat the input while care is locked.
       assert.equal(app.save().feedCount, saved.feedCount);
@@ -662,12 +721,12 @@ test('Real action buttons complete each care route from every permitted room', a
           assert.equal(played.at(-1), clip);
           if (isFeed) assert.equal(portions(), 0);
         }
-        viewer.currentTime = isFeed ? viewer.duration : 3.7;
+        viewer.currentTime = isFeed || isSleep ? viewer.duration : 3.7;
         frames.shift()();
         await settle();
       }
       assert.deepEqual(played, [...clips, 'Idle']);
-      assert.equal(room(), isFeed ? 'kitchen' : origin);
+      assert.equal(room(), isFeed || isSleep ? destination : origin);
       if (isFeed) {
         assert.equal(bowlLevel(), 0);
         assert.equal(portions(), 0);

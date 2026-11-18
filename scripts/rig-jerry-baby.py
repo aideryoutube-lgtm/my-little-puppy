@@ -366,9 +366,12 @@ def eat(t):
     return data
 
 
-# The bedroom rug serves as a floor-level sleeping spot, in front of the bed.
-bed_heading = 1.68
-bed_distance = .55
+# Sleep uses artwork-space travel (jerry-baby-3d.js). These poses animate
+# the rig locally, so mattress elevation does not change the camera framing.
+bed_heading = 2.72
+bed_rest_heading = 1.57
+bed_exit_heading = bed_heading - math.pi
+bed_turn_time = 2.2
 ball_heading = math.radians(120)
 ball_approach = .32
 chase_distance = .76
@@ -410,20 +413,115 @@ def add_ball():
     return node
 
 
-def sleep_pose(amount, closed, breath=0, stretch=0):
-    data = route_pose(bed_distance, bed_heading, bed_heading)
-    drop = .29 * amount
+def bed_stand(heading):
+    return route_pose(0, heading, heading)
+
+
+def bed_gait(t, duration, start, end, step_stride, turning=False):
+    heading = start + (end - start) * smooth(t / duration) if turning else start
+    data = bed_stand(heading)
+    effort = smooth(t / .12) * smooth((duration - t) / .12)
+    bob = .018 * effort * math.sin(math.tau * 2 * t / period)
+    offset(data, body, dy=bob)
+    walk_steps(data, t, period, step_stride, bob, turning, effort)
+    return data
+
+
+def approach_bed(t):
+    if t < .5:
+        return bed_gait(t, .5, 0, bed_heading, 0, True)
+    return bed_gait(t - .5, 2.8, bed_heading, bed_heading, .43)
+
+
+def bed_crouch(amount):
+    data = bed_stand(bed_heading)
+    offset(data, body, dy=-.21 * amount, dz=-.10 * amount)
+    for index, (upper, paw) in enumerate(legs):
+        offset(data, upper, dy=.13 * amount, dz=.10 * amount)
+        offset(data, paw, dy=.08 * amount)
+    data[neck, 'rotation'] = quaternion(0, -.17 * amount)
+    return data
+
+
+def mattress_contact(heading, front=True, weight=1):
+    data = bed_stand(heading)
+    offset(data, body, dy=-.10 * weight)
+    for index, (upper, paw) in enumerate(legs):
+        lift = .22 * weight if (index < 2) != front else 0
+        offset(data, upper, dy=.10 * weight + lift * .55)
+        offset(data, paw, dy=lift * .45, dz=.13 * weight if index < 2 else -.08 * weight)
+    data[neck, 'rotation'] = quaternion(0, .20 * weight)
+    return data
+
+
+def blend_pose(start, end, weight):
+    return {key: (left + (end[key] - left) * weight if isinstance(left, (float, int))
+                  else [a + (b - a) * weight for a, b in zip(left, end[key])])
+            for key, left in start.items()}
+
+
+def bed_jump(t, duration, heading, departure, arrival):
+    phase = t / duration
+    flight = bed_stand(heading)
+    offset(flight, body, dy=.13, dz=.10)
+    for index, (upper, paw) in enumerate(legs):
+        offset(flight, upper, dy=.07 if index < 2 else -.10, dz=.15 if index < 2 else -.19)
+        offset(flight, paw, dy=.12 if index < 2 else -.04, dz=.10 if index < 2 else -.10)
+    flight[neck, 'rotation'] = quaternion(0, -.28 if heading == bed_heading else .26)
+    if phase < .38:
+        return blend_pose(departure, flight, smooth(phase / .38))
+    return blend_pose(flight, arrival, smooth((phase - .38) / .62))
+
+
+def settle_on_bed(t):
+    if t < .85:
+        return bed_gait(t, .85, bed_heading, bed_heading, .25)
+    return bed_gait(t - .85, bed_turn_time, bed_heading, bed_rest_heading + 2 * math.tau, 0, True)
+
+
+def leave_bed(t):
+    if t < .52:
+        return bed_gait(t, .52, bed_rest_heading, bed_exit_heading, 0, True)
+    return bed_gait(t - .52, .85, bed_exit_heading, bed_exit_heading, .25)
+
+
+def sleep_walk_home(t):
+    if t < .26:
+        return mattress_contact(bed_exit_heading, weight=1 - smooth(t / .26))
+    if t < 3.06:
+        return bed_gait(t - .26, 2.8, bed_exit_heading, bed_exit_heading, .43)
+    return bed_gait(t - 3.06, .5, bed_exit_heading, 0, 0, True)
+
+
+def sleep_pose(amount, closed, breath=0, stretch=0, dream_time=0):
+    data = bed_stand(bed_rest_heading)
+    drop = .49 * amount
+    # Tuck the hind legs, stretch the forepaws and curl the head toward
+    # the chest. Oppose torso movement at the legs to keep the paws planted.
     offset(data, body, dy=-drop + breath)
     for index, (upper, paw) in enumerate(legs):
         front = index < 2
-        reach_forward = (.24 if front else .10) * amount + (.18 * stretch if front else 0)
-        offset(data, upper, dy=drop * .52 - breath, dz=reach_forward * .40)
-        offset(data, paw, dy=drop * .48, dz=reach_forward * .60)
-    data[neck, 'rotation'] = quaternion(0, .31 * amount - .13 * stretch)
-    data[head, 'rotation'] = quaternion(0, .24 * amount - .21 * stretch)
-    data[tail, 'rotation'] = quaternion(0, -.28 * amount)
+        reach_forward = (.30 if front else .18) * amount + (.16 * stretch if front else 0)
+        offset(data, upper, dy=drop * .55 - breath, dz=reach_forward * .40)
+        offset(data, paw, dy=drop * .45, dz=reach_forward * .60)
+    data[neck, 'rotation'] = quaternion(0, .69 * amount - .22 * stretch)
+    data[head, 'rotation'] = quaternion(0, -.16 * amount)
+    tail_twitch = math.sin(math.tau * dream_time / 2.4) * .07
+    data[tail, 'rotation'] = quaternion(0, -.36 * amount + tail_twitch)
+    for index, ear in enumerate(ears):
+        flick = math.sin(math.pi * np.clip((dream_time - .7 - .24 * index) / .36, 0, 1))**2
+        data[ear, 'rotation'] = quaternion(2, (-1)**index * .11 * flick)
     data[0, 'weights'] = closed
     return data
+
+
+def lie_down(t):
+    return sleep_pose(smooth(t / 1.12), smooth((t - .52) / .56))
+
+
+def wake_up(t):
+    return sleep_pose(1 - smooth((t - .22) / 1.32), 1 - smooth(t / .42),
+                      stretch=smooth((t - .46) / .42) * (1 - smooth((t - 1.13) / .54)))
 
 
 def ball_pose(data, roll=0, visible=1):
@@ -484,17 +582,19 @@ clip('Eat', 5.16 + blend_hold, eat)
 clip('WalkHome', 2 * turn_time + travel_time + blend_hold,
      lambda t: kitchen_walk(min(t, 2 * turn_time + travel_time), home=True))
 ball = add_ball()
-clip('WalkToBed', turn_time + bed_distance * period / stride + blend_hold,
-     lambda t: route_walk(t, route_heading=bed_heading, distance=bed_distance))
-clip('LieDown', 1.05 + blend_hold,
-     lambda t: sleep_pose(smooth(t / 1.05), smooth((t - .46) / .52)))
-clip('Sleep', 3.6 + blend_hold,
-     lambda t: sleep_pose(1, 1, .012 * math.sin(math.tau * min(t, 3.6) / 1.8)))
-clip('WakeUp', 1.65 + blend_hold,
-     lambda t: sleep_pose(1 - smooth((t - .37) / .93), 1 - smooth(t / .45),
-                          stretch=smooth((t - .44) / .38) * (1 - smooth((t - .90) / .63))))
-clip('SleepWalkHome', 2 * turn_time + bed_distance * period / stride + blend_hold,
-     lambda t: route_walk(t, home=True, route_heading=bed_heading, distance=bed_distance))
+clip('ApproachBed', 3.3, approach_bed)
+clip('Crouch', .46, lambda t: bed_crouch(smooth(t / .46)))
+clip('JumpUp', .64, lambda t: bed_jump(t, .64, bed_heading, bed_crouch(1), mattress_contact(bed_heading)))
+clip('LandOnMattress', .30, lambda t: mattress_contact(bed_heading, weight=1 - smooth(t / .30)))
+clip('SettleOnMattress', .85 + bed_turn_time, settle_on_bed)
+clip('LieDown', 1.12, lie_down)
+clip('Sleep', 4.8,
+     lambda t: sleep_pose(1, 1, .012 * math.sin(math.tau * t / 2.4), dream_time=t))
+clip('WakeUp', 1.75, wake_up)
+clip('WalkToBedEdge', 1.37, leave_bed)
+clip('JumpDown', .56, lambda t: bed_jump(t, .56, bed_exit_heading, bed_stand(bed_exit_heading),
+                                        mattress_contact(bed_exit_heading)))
+clip('SleepWalkHome', 3.56, sleep_walk_home)
 clip('WalkToBall', turn_time + ball_approach * period / stride + blend_hold,
      lambda t: ball_pose(route_walk(t, route_heading=ball_heading, distance=ball_approach),
                          visible=smooth(t / .28)))
