@@ -43,6 +43,7 @@ test('3D Baby follows room changes and keeps the still on renderer failure', asy
   const scene = doc.getElementById('scene');
   const shown = () => scene.classList.contains('jerry-baby-3d-ready');
   window.HTMLElement.prototype.dismissPoster = () => {};
+  window.HTMLElement.prototype.pause = () => {};
   window.eval(run);
   assert.equal(doc.getElementById('jerryBaby3D'), null);
 
@@ -483,5 +484,120 @@ test('House and kitchen Drink controls dispatch care and block repeat water rewa
     assert.deepEqual(actions, ['house', 'drink']);
   } finally {
     app.close();
+  }
+});
+
+test('Saving care progress cannot cancel the 3D action through an unchanged effects preference', async t => {
+  const { mount } = require('./support/mini-harness.cjs');
+  const app = mount({ coins: 100, xp: 0, world: { room: 'living' } });
+  t.after(app.close);
+  const { w, $ } = app;
+  w.matchMedia = () => ({ matches: false, addEventListener() {} });
+  Object.defineProperty(w.document, 'hidden', { value: false });
+  for (const file of ['world.js', 'experience-ui.js']) {
+    w.eval(fs.readFileSync(path.join(root, file), 'utf8'));
+  }
+  const played = [];
+  Object.assign(w.HTMLElement.prototype, {
+    availableAnimations: ['Idle', 'WalkToBowl', 'Eat', 'WalkHome'],
+    duration: 4,
+    dismissPoster() {},
+    play() { played.push(this.animationName); },
+    pause() {},
+  });
+  w.eval(run);
+  $('#jerryBaby3D').dispatchEvent(new w.Event('load'));
+  await settle();
+  app.click('#food');
+  await settle();
+  assert.equal(app.save().xp, 10);
+  assert.equal(app.save().world.room, 'kitchen');
+  assert.equal(played.at(-1), 'WalkToBowl');
+  w.PawtopiaExperienceUI.sync();
+  w.PawtopiaWorldUI.refresh();
+  await settle();
+  assert.equal(played.at(-1), 'WalkToBowl');
+  assert($('#food').disabled);
+});
+
+test('Real action buttons complete each care route from every permitted room', async t => {
+  const { mount } = require('./support/mini-harness.cjs');
+  const app = mount({ coins: 100, xp: 0, world: { room: 'living' } });
+  t.after(app.close);
+  const { w, $ } = app;
+  w.matchMedia = () => ({ matches: false, addEventListener() {} });
+  let hidden = false;
+  Object.defineProperty(w.document, 'hidden', { get: () => hidden });
+  for (const file of ['world.js', 'experience-ui.js']) {
+    w.eval(fs.readFileSync(path.join(root, file), 'utf8'));
+  }
+  const actions = [
+    ['#food', 'kitchen', ['WalkToBowl', 'Eat', 'WalkHome']],
+    ['#sleep', 'bedroom', ['WalkToBed', 'LieDown', 'Sleep', 'WakeUp', 'SleepWalkHome']],
+    ['#bath', 'bathroom', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
+    ['#ball', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
+    ['#home', 'garden', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome']],
+    ['[data-kitchen-water]', 'kitchen', ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome']],
+    ['#dress', null, ['DressTurn']],
+  ];
+  // Put each action on its XP cooldown so the matrix remains in the Baby stage.
+  const save = app.save();
+  for (const action of ['Feed', 'Sleep', 'Care', 'Play']) save.xpCooldowns[action] = Date.now();
+  assert(w.pawtopiaData.restore(w.PawtopiaSaveTools.create(save, w.localStorage)).ok);
+  const played = [];
+  const frames = [];
+  w.requestAnimationFrame = callback => frames.push(callback);
+  Object.assign(w.HTMLElement.prototype, {
+    availableAnimations: ['Idle', ...actions.flatMap(action => action[2])],
+    duration: 4,
+    dismissPoster() {},
+    play() { played.push(this.animationName); },
+    pause() {},
+  });
+  w.eval(run);
+  const viewer = $('#jerryBaby3D');
+  viewer.dispatchEvent(new w.Event('load'));
+  await settle();
+  const room = () => app.save().world.room;
+  for (const origin of ['living', 'kitchen', 'bedroom', 'bathroom', 'garden']) {
+    for (const [button, destination, clips] of actions) {
+      if (button === '[data-kitchen-water]' && origin !== 'kitchen') continue;
+      app.click(`[data-room="${origin}"]`);
+      await settle();
+      played.length = 0;
+      app.click(button);
+      if (button === '#dress') {
+        const outfit = app.save().world.equipped.outfit === 'baby-blue-shirt'
+          ? 'baby-yellow-coat' : 'baby-blue-shirt';
+        app.click(`[data-dress-item="${outfit}"]`);
+        assert.equal(app.save().world.equipped.outfit, outfit);
+      }
+      const saved = app.save();
+      $(button)?.click(); // Immediately repeat the input while care is locked.
+      assert.equal(app.save().feedCount, saved.feedCount);
+      assert.equal(app.save().hunger, saved.hunger);
+      await settle();
+      for (const clip of clips) {
+        assert.equal(room(), destination ?? origin);
+        assert.equal(played.at(-1), clip);
+        assert($('#scene').hasAttribute('data-care-busy'));
+        // Safari suppresses frames while the page is in the background.
+        for (const visibility of [true, false]) {
+          hidden = visibility;
+          w.document.dispatchEvent(new w.Event('visibilitychange'));
+          await settle();
+          assert.equal(played.at(-1), clip);
+        }
+        viewer.currentTime = 0.5;
+        frames.shift()();
+        assert.equal(played.at(-1), clip);
+        viewer.currentTime = 3.7;
+        frames.shift()();
+        await settle();
+      }
+      assert.deepEqual(played, [...clips, 'Idle']);
+      assert.equal(room(), origin);
+      assert(!$('#food').disabled && !$('#scene').hasAttribute('data-care-busy'));
+    }
   }
 });

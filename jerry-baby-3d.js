@@ -7,9 +7,7 @@ let failed = false;
 let clip = '';
 let walkTimer;
 let currentRoom = '';
-let pendingAction;
-let sequence;
-let returnRoom;
+let care;
 let wardrobe = [];
 let fur;
 let dryFur;
@@ -70,23 +68,36 @@ async function play(name) {
   wetFur(name === 'BathShake' ? 1 : 0);
   // The renderer applies animationName asynchronously with its default loop mode.
   await target.updateComplete;
-  if (request !== playbackRequest || viewer !== target || target.hidden || document.hidden) return;
-  const sequenceClip = Boolean(sequence && name !== 'Idle');
+  if (request !== playbackRequest || viewer !== target || target.hidden) return;
+  const sequenceClip = Boolean(care && name !== 'Idle');
   if (sequenceClip) target.currentTime = 0;
   target.play(name === 'Idle' || sequenceClip ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
+  if (care && !(target.duration > 0)) {
+    stopCare('Renderer did not select clip ' + name, true);
+    return;
+  }
   if (sequenceClip) {
+    careDebug('clip started: ' + name);
     // Hold each end pose in the GLB and transition while the mixer is live.
     // A one-shot finished event pauses model-viewer before it can crossfade.
     let previousTime = 0;
-    function blendAtEnd() {
-      if (request !== playbackRequest || viewer !== target || !sequence) return;
+    let lastProgressAt;
+    function blendAtEnd(timestamp) {
+      if (request !== playbackRequest || viewer !== target || !care) return;
       const time = target.currentTime;
       if (name === 'BathWash') wetFur(Math.min(1, time / .65));
       if (name === 'BathShake') wetFur(Math.max(0, Math.min(1, (1.55 - time) / .72)));
       if (target.duration > 0 && (time >= target.duration - .36 || time < previousTime)) {
-        finished();
+        advanceCare();
       } else {
+        // model-viewer suspends its mixer when scrolled out of view.
+        if (!target.modelIsVisible || document.hidden || time !== previousTime) lastProgressAt = timestamp;
+        lastProgressAt ??= timestamp;
+        if (timestamp - lastProgressAt > 4000) {
+          stopCare('Playback stalled in ' + name, true);
+          return;
+        }
         previousTime = time;
         window.requestAnimationFrame(blendAtEnd);
       }
@@ -128,77 +139,70 @@ function clearCareRoute([left, right, top, bottom]) {
     room.top + room.height * top, room.top + room.height * bottom);
 }
 
-function cancelCare() {
-  lockCare(false);
-  wetFur(0);
-  pendingAction = undefined;
-  sequence = undefined;
-  returnRoom = undefined;
+function careDebug(message) {
+  window.dispatchEvent(new CustomEvent('baby-care-debug', { detail: message }));
 }
 
-function careDebug(message) {
-  window.dispatchEvent(new CustomEvent('baby-care-debug', {detail: String(message)}));
+function roomName() {
+  return [...canvas.classList].find(name => /^room-(living|kitchen|bedroom|bathroom|garden)$/.test(name))
+    ?.slice('room-'.length);
 }
-function startCare() {
-  careDebug('start: ' + (pendingAction || 'none') + ', room=' + currentRoom + ', clip=' + clip);
-  if (!pendingAction || !ready || viewer.hidden || document.hidden || clip !== 'Idle') { careDebug('start blocked: pending=' + pendingAction + ', ready=' + ready + ', hidden=' + viewer.hidden + ', clip=' + clip); return; }
-  const request = pendingAction;
-  const action = careActions[request];
-  if ((request === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) ||
-      motionReduced() || roomBlocked() ||
-      !action.clips.every(name => viewer.availableAnimations?.includes(name))) {
-    careDebug('action rejected: ' + request + ', missing clips=' + action.clips.filter(name => !viewer.availableAnimations?.includes(name)).join(',') + ', roomBlocked=' + roomBlocked() + ', reducedMotion=' + motionReduced());
-    cancelCare();
-    return;
-  }
-  const origin = currentRoom;
-  if (origin !== 'room-' + action.room) {
-    if (!origin || !window.pawtopiaWorld?.commit('room', action.room).ok) {
-      cancelCare();
-      return;
-    }
-    // Keep pendingAction until the destination room has mounted.
-    // Previously it was cleared before commit(), so the room observer
-    // cancelled the action without ever playing the first clip.
-    returnRoom = origin.slice('room-'.length);
-    careDebug('room switch requested: ' + action.room);
-    return;
-  }
-  if (!clearCareRoute(action.route)) { careDebug('care route blocked: ' + request);
-    if (returnRoom) window.pawtopiaWorld.commit('room', returnRoom);
-    cancelCare();
-    return;
-  }
-  pendingAction = undefined;
+
+function stopCare(reason, restoreRoom = false) {
+  const origin = care?.origin;
+  if (care) careDebug(care.action + ': ' + reason);
+  care = undefined;
+  playbackRequest++;
   clearTimeout(walkTimer);
-  sequence = action;
-  lockCare(true);
-  careDebug('playing ' + action.clips[0]);
-  play(action.clips[0]);
+  wetFur(0);
+  lockCare(false);
+  if (restoreRoom && origin && roomName() !== origin) {
+    const result = window.pawtopiaWorld?.commit('room', origin);
+    if (!result?.ok) careDebug('Could not restore room: ' + (result?.message ?? origin));
+  }
+  currentRoom = roomName();
+  if (ready && !viewer.hidden && viewer.availableAnimations?.includes('Idle')) idle();
+}
+
+function playCareClip() {
+  const index = care.index;
+  const last = care.clips.length - 1;
+  care.state = last === 0 ? 'PerformingAction' : index === 0 ? 'Moving' :
+    index === last ? 'Returning' : 'PerformingAction';
+  const name = care.clips[index];
+  careDebug(care.state + ': ' + name);
+  play(name).catch(error => stopCare('Playback failed: ' + error.message, true));
+}
+
+function startCare() {
+  if (!care || care.state !== 'WaitingForRoom' || !ready || viewer.hidden || document.hidden) return;
+  if (roomName() !== care.room) return;
+  const missing = care.clips.filter(name => !viewer.availableAnimations?.includes(name));
+  if (missing.length) return stopCare('Missing clips: ' + missing.join(', '), true);
+  if (roomBlocked()) return stopCare('Room is covered by a dialog or decor editor', true);
+  if (care.route && !clearCareRoute(care.route)) return stopCare('Decoration in the walking path', true);
+  playCareClip();
+}
+
+function advanceCare() {
+  careDebug('clip finished: ' + care.clips[care.index]);
+  care.index++;
+  if (care.index === care.clips.length) stopCare('completed', true);
+  else playCareClip();
 }
 
 function finished() {
-  if (sequence) {
-    const next = sequence.clips[sequence.clips.indexOf(clip) + 1];
-    if (next) {
-      play(next);
-      return;
-    }
-    const origin = returnRoom;
-    cancelCare();
-    if (origin) window.pawtopiaWorld.commit('room', origin);
-  }
-  if (clip !== 'Idle') idle();
+  // Care clips advance before the authored end hold expires. Only Walk and
+  // Happy use the renderer's one-shot completion event.
+  if (!care && (clip === 'Walk' || clip === 'Happy')) idle();
 }
 
 function idle() {
   clearTimeout(walkTimer);
-  lockCare(false);
   play('Idle');
-  startCare();
-  if (sequence || motionReduced()) return;
+  if (motionReduced() || document.hidden) return;
   walkTimer = setTimeout(function stroll() {
-    if (!viewer || viewer.hidden || document.hidden || clip !== 'Idle') return;
+    if (!viewer || viewer.hidden || document.hidden || care || clip !== 'Idle') return;
     if (canWalk()) play('Walk');
     else walkTimer = setTimeout(stroll, 8000);
   }, 8500);
@@ -234,14 +238,15 @@ function sync() {
       ready = true;
       viewer.dismissPoster();
       sync();
-      if (viewer.availableAnimations?.includes('Idle')) idle();
+      if (!care && viewer.availableAnimations?.includes('Idle')) idle();
     });
     viewer.addEventListener('finished', finished);
     viewer.addEventListener('error', () => {
       clearTimeout(walkTimer);
       failed = true;
       ready = false;
-      cancelCare();
+      stopCare('Model failed to load', true);
+      careDebug('Model failed to load');
       viewer.remove();
       viewer = undefined;
       wardrobe = [];
@@ -251,28 +256,17 @@ function sync() {
     scene.prepend(viewer);
   }
   if (viewer) {
-    const room = [...canvas.classList].find(name => /^room-(living|kitchen|bedroom|bathroom|garden)$/.test(name));
+    const room = roomName();
     const changed = viewer.hidden === show || currentRoom !== room;
-    // A care request can switch rooms before MutationObserver runs.
-    const enteringCareRoom = sequence && returnRoom && room === 'room-' + sequence.room;
     currentRoom = room;
     viewer.hidden = !show;
-    if (ready && clip && changed) {
-      if (!show) {
-        cancelCare();
-        clearTimeout(walkTimer);
-        viewer.pause();
-      } else if (enteringCareRoom) {
-        // Keep the active sequence when its own room transition completes.
-      } else if (pendingAction) {
-        // A pending care action must survive switching to its destination room.
-        // Clearing it here caused Feed, Sleep, Bath, Play and House to do nothing.
-        clearTimeout(walkTimer);
-        play('Idle').then(() => startCare());
-      } else {
-        cancelCare();
-        idle();
-      }
+    if (!show && changed) {
+      stopCare('Baby viewer hidden');
+      viewer.pause();
+    } else if (show && ready) {
+      if (care && room !== care.room) stopCare('Room changed by player');
+      else if (care) startCare();
+      else if (changed && clip) idle();
     }
   }
   scene.classList.toggle('jerry-baby-3d-ready', show && ready);
@@ -280,43 +274,62 @@ function sync() {
 
 scene.addEventListener('pawtopia-jerry-action', event => {
   const { action } = event.detail;
-  careDebug('button: ' + action + ', stage=' + scene.dataset.growthStage);
-  if (Object.hasOwn(careActions, action) && scene.dataset.growthStage === 'Baby') {
-    if (failed || sequence || pendingAction || clip === 'DressTurn' || motionReduced()) return;
-    if (action === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) return;
-    if (action === 'drink' && currentRoom !== 'room-kitchen') return;
-    pendingAction = action;
-    if (ready && !viewer.hidden) lockCare(true);
-    startCare();
+  const origin = roomName();
+  if (scene.dataset.growthStage !== 'Baby' || !origin) return;
+  const config = Object.hasOwn(careActions, action) ? careActions[action] :
+    action === 'dress-show' ? { room: origin, clips: ['DressTurn'] } : undefined;
+  if (!config && action !== 'touch') return;
+  if (failed || care || viewer?.hidden || motionReduced()) {
+    careDebug('Ignored ' + action + ': ' + (care ? 'busy' : 'viewer or motion setting'));
     return;
   }
-  if (action === 'dress-show' && ready && !viewer.hidden && !sequence && !pendingAction && clip !== 'DressTurn' && !roomBlocked() &&
-      !motionReduced() && viewer.availableAnimations?.includes('DressTurn')) {
+  if (action === 'touch') {
+    if (!ready || !clip || clip === 'Happy') return;
     clearTimeout(walkTimer);
-    lockCare(true);
-    play('DressTurn');
+    play('Happy');
     return;
   }
-  if (action !== 'touch' || !ready || viewer.hidden || !clip ||
-      sequence || pendingAction || clip === 'Happy' || clip === 'DressTurn' || motionReduced()) return;
+  if (action === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) {
+    careDebug('House is unavailable until owned');
+    return;
+  }
+  if (action === 'drink' && origin !== 'kitchen') {
+    careDebug('Drink requires the kitchen');
+    return;
+  }
+  if (roomBlocked()) {
+    careDebug('Ignored ' + action + ': room blocked');
+    return;
+  }
   clearTimeout(walkTimer);
-  play('Happy');
+  care = { ...config, action, origin, index: 0, state: 'WaitingForRoom' };
+  lockCare(true);
+  careDebug('WaitingForRoom: ' + action + ' in ' + config.room);
+  if (origin !== config.room) {
+    const result = window.pawtopiaWorld?.commit('room', config.room);
+    if (!result?.ok) stopCare('Room switch failed: ' + (result?.message ?? config.room));
+    // The room observer starts playback after the destination mounts.
+  } else startCare();
 });
 
+let lastReducedMotion = Boolean(motionReduced());
 function syncMotion() {
-  if (ready && viewer && !viewer.hidden && clip) {
-    cancelCare();
-    idle();
-  }
+  const reduced = Boolean(motionReduced());
+  if (lastReducedMotion === reduced) return;
+  lastReducedMotion = reduced;
+  if (ready && viewer && !viewer.hidden && clip) stopCare('Motion preference changed', true);
 }
-reducedMotion?.addEventListener('change', syncMotion);
+reducedMotion?.addEventListener?.('change', syncMotion);
 document.addEventListener('visibilitychange', () => {
-  if (!ready || !viewer || viewer.hidden || !clip) return;
   if (document.hidden) {
-    cancelCare();
     clearTimeout(walkTimer);
-    viewer.pause();
-  } else idle();
+    return;
+  }
+  if (!ready || viewer.hidden) return;
+  // The browser suspends animation frames while hidden. Keep the current
+  // mixer time and continue the same clip or start the queued request.
+  if (care) startCare();
+  else if (clip === 'Idle') idle();
 });
 new MutationObserver(syncMotion).observe(document.documentElement, {
   attributes: true, attributeFilter: ['data-effects']
