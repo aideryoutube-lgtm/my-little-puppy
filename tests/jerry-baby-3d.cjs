@@ -113,7 +113,10 @@ test('Touch interrupts Walk once and Happy ends in Idle', async t => {
   window.clearTimeout = () => {};
   Object.assign(window.HTMLElement.prototype, {
     availableAnimations: ['Idle', 'Walk', 'Happy'],
-    play(options) { played.push([this.animationName, options.repetitions]); },
+    play(options) {
+      this.duration = feedClipDurations[this.animationName] ?? 4;
+      played.push([this.animationName, options.repetitions]);
+    },
     dismissPoster() {},
     pause() {},
   });
@@ -236,6 +239,22 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   assert.deepEqual(samples('PlayWalkHome', ball, 'scale').at(-1), [0, 0, 0]);
 });
 
+const feedClipDurations = { WalkToBowl: 3.93, Eat: 5.71, WalkHome: 4.41 };
+
+function loadFoodBowl(window) {
+  const foodBowl = window.document.getElementById('babyFoodBowl');
+  const materials = Array.from({ length: 8 }, (_, index) => ({
+    name: 'Kibble ' + (index + 1),
+    pbrMetallicRoughness: {
+      baseColorFactor: [.3, .1, .03, 1],
+      setBaseColorFactor(color) { this.baseColorFactor = color; }
+    }
+  }));
+  foodBowl.model = { materials };
+  foodBowl.dispatchEvent(new window.Event('load'));
+  return materials;
+}
+
 test('Feed goes to the kitchen, blends through Eat, returns home and cancels on manual room change', async t => {
   const { window } = new JSDOM(
     '<div id="roomCanvas" class="room-garden"><div id="scene" data-growth-stage="Baby"></div></div>',
@@ -259,7 +278,10 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
     availableAnimations: ['Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome'],
     duration: 4,
     dismissPoster() {},
-    play(options) { played.push([this.animationName, options.repetitions]); },
+    play(options) {
+      this.duration = feedClipDurations[this.animationName] ?? 4;
+      played.push([this.animationName, options.repetitions]);
+    },
     pause() {},
   });
   window.eval(run);
@@ -271,15 +293,18 @@ test('Feed goes to the kitchen, blends through Eat, returns home and cancels on 
   await settle();
   feed();
   await settle();
+  assert.equal(viewer.animationName, 'Idle');
+  loadFoodBowl(window);
+  await settle();
   assert.equal(viewer.animationName, 'WalkToBowl');
   feed();
   for (const next of ['Eat', 'WalkHome', 'Idle']) {
-    viewer.currentTime = 3.7;
+    viewer.currentTime = viewer.duration;
     frames.shift()();
     await settle();
     assert.equal(viewer.animationName, next);
   }
-  assert.deepEqual(played, ['Idle', 'WalkToBowl', 'Eat', 'WalkHome', 'Idle'].map(name => [name, undefined]));
+  assert.deepEqual(played, [['Idle', undefined], ['WalkToBowl', 1], ['Eat', 1], ['WalkHome', 1], ['Idle', undefined]]);
   assert.deepEqual(visits, ['kitchen']);
   assert.equal(doc.querySelectorAll('#jerryBaby3D').length, 1);
   feed();
@@ -508,6 +533,7 @@ test('Saving care progress cannot cancel the 3D action through an unchanged effe
     pause() {},
   });
   w.eval(run);
+  loadFoodBowl(w);
   $('#jerryBaby3D').dispatchEvent(new w.Event('load'));
   await settle();
   app.click('#food');
@@ -553,7 +579,10 @@ test('Real action buttons complete each care route from every permitted room', a
     availableAnimations: ['Idle', ...actions.flatMap(action => action[2])],
     duration: 4,
     dismissPoster() {},
-    play() { played.push(this.animationName); },
+    play() {
+      this.duration = feedClipDurations[this.animationName] ?? 4;
+      played.push(this.animationName);
+    },
     pause() {},
   });
   w.eval(run);
@@ -562,15 +591,7 @@ test('Real action buttons complete each care route from every permitted room', a
   await settle();
   const foodBowl = $('#babyFoodBowl');
   assert.equal(foodBowl.localName, 'model-viewer');
-  const materials = Array.from({ length: 8 }, (_, index) => ({
-    name: 'Kibble ' + (index + 1),
-    pbrMetallicRoughness: {
-      baseColorFactor: [.3, .1, .03, 1],
-      setBaseColorFactor(color) { this.baseColorFactor = color; }
-    }
-  }));
-  foodBowl.model = { materials };
-  foodBowl.dispatchEvent(new w.Event('load'));
+  const materials = loadFoodBowl(w);
   const portions = () => materials.filter(m => m.pbrMetallicRoughness.baseColorFactor[3] === 1).length;
   assert.equal(portions(), 0);
   const room = () => app.save().world.room;
@@ -606,24 +627,42 @@ test('Real action buttons complete each care route from every permitted room', a
           assert.equal(played.at(-1), clip);
         }
         if (isFeed && clip === 'WalkToBowl') {
-          assert.equal(bowlLevel(), 100);
-          assert.equal(portions(), 8);
-        }
-        if (isFeed && clip === 'Eat') {
-          for (const [time, level] of [[1.22, 75], [2.10, 50], [2.98, 25]]) {
+          // Sample the initial turn, every stride and the stationary arrival hold.
+          for (let frame = 0; frame <= 235; frame++) {
+            viewer.currentTime = frame / 60;
+            frames.shift()(frame * 1000 / 60);
+            assert.equal(bowlLevel(), 100);
+            assert.equal(portions() * 4, 32);
+            assert.equal(played.at(-1), clip);
+          }
+          // The arrival gate uses in-clip progress even after a prolonged pause.
+          viewer.paused = true;
+          frames.shift()(12000);
+          assert.equal(portions() * 4, 32);
+          assert.equal(played.at(-1), clip);
+          viewer.paused = false;
+        } else if (isFeed && clip === 'Eat') {
+          for (const [time, pellets] of [[0, 32], [.66, 32], [1.22, 24], [2.10, 16], [2.98, 8], [3.86, 0]]) {
             viewer.currentTime = time;
             frames.shift()();
-            assert.equal(bowlLevel(), level);
-            assert.equal(portions(), level / 12.5);
+            assert.equal(portions() * 4, pellets);
             assert.equal(app.save().feedCount, saved.feedCount);
             assert.equal(app.save().hunger, saved.hunger);
+            if (pellets === 24) {
+              viewer.paused = true;
+              frames.shift()(24000);
+              assert.equal(portions() * 4, 24);
+              assert.equal(played.at(-1), 'Eat');
+              viewer.paused = false;
+            }
           }
-          // Finish the clip below without going backwards in the timeline.
-          viewer.currentTime = 3.45;
-        } else viewer.currentTime = 0.5;
-        frames.shift()();
-        assert.equal(played.at(-1), clip);
-        viewer.currentTime = 3.7;
+        } else {
+          viewer.currentTime = 0.5;
+          frames.shift()();
+          assert.equal(played.at(-1), clip);
+          if (isFeed) assert.equal(portions(), 0);
+        }
+        viewer.currentTime = isFeed ? viewer.duration : 3.7;
         frames.shift()();
         await settle();
       }

@@ -297,9 +297,9 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
  transform:translate(-50%,-50%);--poster-color:transparent}
 .room-kitchen > #scene.jerry-baby-3d-ready.baby-food-bowl-ready #babyFoodBowl{visibility:visible}
 
-/* The patch matches pixels (780,1080)–(918,1202) in the 941 × 1672 artwork. */
+/* The patch matches pixels (764,1078)–(930,1215) in the 941 × 1672 artwork. */
 #babyFoodRug{display:none;position:absolute;z-index:0;pointer-events:none;
- left:82.8905%;top:64.5933%;width:14.6652%;height:7.2967%;
+ left:81.1902%;top:64.4737%;width:17.6408%;height:8.1938%;
  background:url('./assets/rooms/Kitchen-Food-Rug-closed.webp') center/100% 100% no-repeat}
 .kitchen-fridge-is-open #babyFoodRug{background-image:url('./assets/rooms/Kitchen-Food-Rug-open.webp')}
 .room-kitchen > #scene.jerry-baby-3d-ready.baby-food-bowl-ready #babyFoodRug{display:block}

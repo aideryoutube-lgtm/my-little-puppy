@@ -13,16 +13,18 @@ let fur;
 let dryFur;
 let wetness = 0;
 let foodLayer;
+let foodFailed = false;
 let foodMaterials = [];
 let foodLevel = 0;
 
 // The rim is anchored to an artwork pixel in the 941 × 1672 portrait kitchen.
 // Use the same anchor for the prop's camera target and Jerry's lowered muzzle.
-const bowl = { centerX: 847.6, centerY: 1111.5, width: 150, height: 136 };
+const bowl = { centerX: 847.6, centerY: 1103.5, width: 190, height: 172 };
 const feedTurn = .48;
 const feedWalk = 5 * .58; // Five planted-paw cycles in rig-jerry-baby.py.
-const biteStart = .66;
-const biteCycle = .88;
+const feedArrival = feedTurn + feedWalk;
+const biteEnds = [1.21, 2.09, 2.97, 3.85];
+const feedStates = { WalkToBowl: 'WalkingToBowl', Eat: 'Eating', WalkHome: 'WalkingHome' };
 
 function makeFoodLayer() {
   foodLayer = document.createElement('model-viewer');
@@ -54,10 +56,13 @@ function makeFoodLayer() {
       .map(material => material.pbrMetallicRoughness);
     setFoodLevel(foodLevel);
     scene.classList.add('baby-food-bowl-ready');
+    startCare();
   });
   foodLayer.addEventListener('error', () => {
     foodMaterials = [];
+    foodFailed = true;
     scene.classList.remove('baby-food-bowl-ready');
+    if (care?.action === 'feed') stopCare('Food bowl failed to load', true);
   });
   const rug = document.createElement('div');
   rug.id = 'babyFoodRug';
@@ -78,13 +83,6 @@ function setFoodLevel(level) {
   }
 }
 
-function biteProgress(time) {
-  const elapsed = Math.max(0, time - biteStart);
-  const bites = Math.floor(elapsed / biteCycle);
-  const fraction = Math.min(1, (elapsed - bites * biteCycle) / .55);
-  return Math.min(1, (bites + fraction) / 4);
-}
-
 // Project the lowered muzzle (the GLB pose at the first bite) through the
 // current model-viewer camera. The GLB handles the gait and planar translation.
 // The screen correction aligns that plane to the floor painted in the kitchen.
@@ -96,12 +94,10 @@ function foodMark() {
   const room = scene.getBoundingClientRect();
   const sinTheta = Math.sin(theta), cosTheta = Math.cos(theta);
   const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi);
-  // Feed heading is 120 degrees. Muzzle projection is 1.275 m of
-  // root translation plus 0.965 m forward to the muzzle.
-  const distance = 2.24;
-  const x = distance * Math.sin(2 * Math.PI / 3) - target.x;
-  const y = -.30 - target.y;
-  const z = distance * Math.cos(2 * Math.PI / 3) - target.z;
+  // Position of the skinned muzzle during the first chew, in GLB coordinates.
+  const x = 1.947 - target.x;
+  const y = -.35 - target.y;
+  const z = -1.131 - target.z;
   const forward = x * sinTheta + z * cosTheta;
   const focal = view.height / (2 * Math.tan(viewer.getFieldOfView() * Math.PI / 360));
   const scale = focal / (radius - (forward * sinPhi + y * cosPhi));
@@ -110,7 +106,7 @@ function foodMark() {
     scale * (y * sinPhi - forward * cosPhi);
   return [
     room.left + room.width * bowl.centerX / 941 - muzzleX,
-    room.top + room.height * bowl.centerY / 1672 - muzzleY
+    room.top + room.height * (bowl.centerY + 8) / 1672 - muzzleY
   ];
 }
 
@@ -120,9 +116,34 @@ function positionFeeding(name, time) {
   const amount = name === 'WalkToBowl' ? travel : name === 'WalkHome' ? 1 - travel : 1;
   const [x, y] = care.foodMark;
   viewer.style.setProperty('translate', `${x * amount}px ${y * amount}px`);
-  if (name === 'Eat') {
-    const remaining = 1 - biteProgress(time);
-    if (foodLevel !== remaining) setFoodLevel(remaining);
+}
+
+function setFeedState(state) {
+  care.state = state;
+  careDebug(state);
+}
+
+function trackFeeding(name, time, duration) {
+  positionFeeding(name, time);
+  switch (care.state) {
+    case 'WalkingToBowl':
+      if (time < feedArrival) return false;
+      setFeedState('ArrivedAtBowl');
+      // The GLB holds this pose through the end of the one-shot clip.
+      return time >= duration;
+    case 'ArrivedAtBowl':
+      return time >= duration;
+    case 'Eating': {
+      const remaining = 1 - biteEnds.filter(end => time >= end).length / biteEnds.length;
+      if (remaining !== foodLevel) setFoodLevel(remaining);
+      if (remaining === 0) setFeedState('Finishing');
+      return time >= duration;
+    }
+    case 'Finishing':
+    case 'WalkingHome':
+      return time >= duration;
+    default:
+      return false;
   }
 }
 const clothing = {
@@ -183,9 +204,10 @@ async function play(name) {
   await target.updateComplete;
   if (request !== playbackRequest || viewer !== target || target.hidden) return;
   const sequenceClip = Boolean(care && name !== 'Idle');
-  if (sequenceClip && care.action === 'feed') positionFeeding(name, 0);
+  const feeding = sequenceClip && care.action === 'feed';
+  if (feeding) positionFeeding(name, 0);
   if (sequenceClip) target.currentTime = 0;
-  target.play(name === 'Idle' || sequenceClip ? {} : { repetitions: 1, pingpong: false });
+  target.play(name === 'Idle' || (sequenceClip && !feeding) ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
   if (care && !(target.duration > 0)) {
     stopCare('Renderer did not select clip ' + name, true);
@@ -193,8 +215,9 @@ async function play(name) {
   }
   if (sequenceClip) {
     careDebug('clip started: ' + name);
-    // Hold each end pose in the GLB and transition while the mixer is live.
-    // A one-shot finished event pauses model-viewer before it can crossfade.
+    // Non-feed care clips keep the mixer live to preserve their crossfades.
+    // Feed uses matching terminal and initial poses and advances at the end
+    // of each one-shot, so a previously playing clip cannot pause the next.
     let previousTime = 0;
     let lastProgressAt;
     function blendAtEnd(timestamp) {
@@ -202,7 +225,17 @@ async function play(name) {
       const time = target.currentTime;
       // On a slow frame the mixer may wrap past the terminal hold.
       const looped = time < previousTime;
-      if (care.action === 'feed') positionFeeding(name, looped ? target.duration : time);
+      // Feed clips are one-shots so a delayed frame cannot confuse a wrap
+      // with arrival. Respect an explicit pause, including for the food.
+      if (feeding) {
+        if ((!target.paused || time >= target.duration) &&
+            trackFeeding(name, time, target.duration)) {
+          advanceCare();
+        } else {
+          window.requestAnimationFrame(blendAtEnd);
+        }
+        return;
+      }
       if (name === 'BathWash') wetFur(Math.min(1, time / .65));
       if (name === 'BathShake') wetFur(Math.max(0, Math.min(1, (1.55 - time) / .72)));
       if (target.duration > 0 && (time >= target.duration - .36 || looped)) {
@@ -271,6 +304,7 @@ function stopCare(reason, restoreRoom = false) {
   const meal = care?.action === 'feed' && care;
   care = undefined;
   if (meal) {
+    careDebug('Idle');
     setFoodLevel(0);
     viewer.style.removeProperty('translate');
   }
@@ -289,9 +323,10 @@ function stopCare(reason, restoreRoom = false) {
 function playCareClip() {
   const index = care.index;
   const last = care.clips.length - 1;
-  care.state = last === 0 ? 'PerformingAction' : index === 0 ? 'Moving' :
-    index === last ? 'Returning' : 'PerformingAction';
   const name = care.clips[index];
+  care.state = care.action === 'feed' ? feedStates[name] :
+    last === 0 ? 'PerformingAction' : index === 0 ? 'Moving' :
+      index === last ? 'Returning' : 'PerformingAction';
   careDebug(care.state + ': ' + name);
   play(name).catch(error => stopCare('Playback failed: ' + error.message, true));
 }
@@ -299,6 +334,7 @@ function playCareClip() {
 function startCare() {
   if (!care || care.state !== 'WaitingForRoom' || !ready || viewer.hidden || document.hidden) return;
   if (roomName() !== care.room) return;
+  if (care.action === 'feed' && !scene.classList.contains('baby-food-bowl-ready')) return;
   const missing = care.clips.filter(name => !viewer.availableAnimations?.includes(name));
   if (missing.length) return stopCare('Missing clips: ' + missing.join(', '), true);
   if (roomBlocked()) return stopCare('Room is covered by a dialog or decor editor', true);
@@ -310,7 +346,6 @@ function startCare() {
 function advanceCare() {
   careDebug('clip finished: ' + care.clips[care.index]);
   care.index++;
-  if (care.action === 'feed' && care.clips[care.index - 1] === 'Eat') setFoodLevel(0);
   if (care.index < care.clips.length) return playCareClip();
   const meal = care.action === 'feed' ? care : undefined;
   stopCare('completed', !meal);
@@ -318,8 +353,8 @@ function advanceCare() {
 }
 
 function finished() {
-  // Care clips advance before the authored end hold expires. Only Walk and
-  // Happy use the renderer's one-shot completion event.
+  // Care advances through its frame tracker. Walk and Happy return to Idle
+  // directly on the renderer's one-shot completion event.
   if (!care && (clip === 'Walk' || clip === 'Happy')) idle();
 }
 
@@ -407,7 +442,7 @@ scene.addEventListener('pawtopia-jerry-action', event => {
     action === 'dress-show' ? { room: origin, clips: ['DressTurn'] } : undefined;
   if (!config && action !== 'touch') return;
   if (finishMeal && care) event.preventDefault();
-  if (failed || care || viewer?.hidden || motionReduced()) {
+  if (failed || care || viewer?.hidden || motionReduced() || (action === 'feed' && foodFailed)) {
     careDebug('Ignored ' + action + ': ' + (care ? 'busy' : 'viewer or motion setting'));
     return;
   }
