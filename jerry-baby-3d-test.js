@@ -40,8 +40,10 @@ async function loadJerry() {
       report('ready', 'Jerry Baby loaded · WebGL 2');
     });
     viewer.addEventListener('error', ({ detail }) => {
-      const message = detail?.sourceError?.message || detail?.type || 'unknown error';
-      fail('Could not display Jerry Baby: ' + message);
+      console.error('Jerry Baby 3D viewer error', detail?.sourceError || detail?.type);
+      fail(detail?.type === 'webglcontextlost'
+        ? 'The browser lost its WebGL context. Reload the page to try again.'
+        : 'Could not load or draw the Jerry Baby GLB. Reload the page to try again.');
     });
     viewer.src = asset;
   } catch (error) {
