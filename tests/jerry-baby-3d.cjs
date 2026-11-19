@@ -95,6 +95,7 @@ test('Animated Baby has a weighted skin, blink and chew morphs and all care clip
     'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'DressTurn',
     'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome',
     'WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome',
+    ...[4, 5, 6, 8, 9, 10, 11].flatMap(count => ['WalkToHouse' + count, 'HouseWalkHome' + count]),
   ]);
   assert(gltf.animations[1].channels.some(channel =>
     channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
@@ -523,8 +524,12 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
   assert.equal(viewer.animationName, 'Idle');
 
   hasHome = true;
+  scene.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 533 });
+  let gardenX = 165;
+  viewer.getBoundingClientRect = () => ({ left: gardenX - 45, width: 90, top: 310, height: 100 });
   for (const [action, room, origin, sequence] of [
-    ['house', 'garden', 'living', house],
+    ['house', 'garden', 'garden', house],
+    ['house', 'garden', 'garden', house],
     ['drink', 'kitchen', 'kitchen', drink],
   ]) {
     canvas.className = 'room-' + origin;
@@ -543,14 +548,20 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
         assert(scene.classList.contains('baby-house-route'));
         if (clip === 'WalkToHouse' || clip === 'HouseWalkHome') {
           const startX = parseFloat(scene.style.getPropertyValue('--house-x'));
+          if (clip === 'WalkToHouse') assert.equal(startX, gardenX / 300 * 100);
           viewer.currentTime = 2.1;
           frames.shift()(2100);
           const currentX = parseFloat(scene.style.getPropertyValue('--house-x'));
           assert(clip === 'WalkToHouse' ? currentX > startX : currentX < startX);
         }
+        if (clip === 'EnterHouse' || clip === 'ExitHouse') {
+          viewer.currentTime = 1;
+          frames.shift()(1000);
+          assert(scene.classList.contains('baby-house-occluded'));
+        }
         if (clip === 'RestInside') {
-          assert.equal(scene.style.getPropertyValue('--house-wall-depth'), '46%');
-          assert.equal(parseFloat(scene.style.getPropertyValue('--house-y')), 735 / 1672 * 100);
+          assert(scene.classList.contains('baby-house-occluded'));
+          assert.equal(parseFloat(scene.style.getPropertyValue('--house-y')), 699 / 1672 * 100);
         }
       }
       viewer.currentTime = action === 'house' ? viewer.duration : 3.7;
@@ -560,7 +571,9 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
     assert.equal(viewer.animationName, 'Idle');
     assert.equal(canvas.className, 'room-' + origin);
     assert(!scene.classList.contains('baby-house-route'));
+    assert(!scene.classList.contains('baby-house-occluded'));
     assert(!home.disabled && !scene.hasAttribute('data-care-busy'));
+    gardenX += 20;
   }
 });
 

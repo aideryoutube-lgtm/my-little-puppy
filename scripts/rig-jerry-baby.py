@@ -338,7 +338,11 @@ def route_walk(t, home=False, *, route_heading=bowl_heading, start=0,
 
 
 def kitchen_walk(t, home=False):
-    return route_walk(t, home, kitchen=True)
+    data = route_walk(t, home, kitchen=True)
+    offset(data, neck)
+    data[tongue, 'scale'] = [0, 0, 0]
+    data[tongue, 'translation'] = nodes[tongue]['translation']
+    return data
 
 
 def eat(t):
@@ -357,8 +361,11 @@ def eat(t):
     final_lick = math.sin(math.pi * np.clip((t - 4.43) / .34, 0, 1))**2
     lick = max(.70 * sip_break, final_lick)
     wag = smooth((t - 4.43) / .17) * (1 - smooth((t - 4.97) / .18))
-    data[neck, 'rotation'] = quaternion(0, .49 * lowering + .035 * chewing)
-    data[head, 'rotation'] = quaternion(0, .37 * lowering + .08 * chewing - .19 * lick)
+    # Lower the neck from the shoulders without levering the ruff upwards.
+    # The small neck drop keeps the muzzle on the bowl mark with less pitch.
+    offset(data, neck, dy=-.137 * lowering, dz=-.021 * lowering)
+    data[neck, 'rotation'] = quaternion(0, .23 * lowering + .025 * chewing)
+    data[head, 'rotation'] = quaternion(0, .38 * lowering + .055 * chewing - .15 * lick)
     data[tongue, 'scale'] = [lick] * 3
     data[tongue, 'translation'] = [0, -.025 + .045 * lick, .49 + .062 * lick]
     data[0, 'weights'] = (.65 * lick, chewing)
@@ -821,27 +828,27 @@ def solid(points, faces):
 
 # House clips animate the existing skeleton in place. The garden renderer
 # follows the painted doorway in screen space using these phase timings.
-house_heading = math.radians(-135)
+house_heading = math.radians(210)
 house_outward = house_heading + math.pi
-house_walk_time = 4.2
-house_entry_time = 1.12
+house_walk_time = 7 * period
+house_entry_time = period * 3
 
 
-def house_walk(t, home=False):
+def house_walk(t, home=False, duration=house_walk_time):
     # Garden camera azimuth supplies the heading for the live start point.
     if t < .5:
         return bed_gait(t, .5, 0, 0, 0, True)
     t -= .5
-    if t < house_walk_time:
-        return bed_gait(t, house_walk_time, 0, 0, .44)
-    return bed_gait(t - house_walk_time, .5 if home else .24, 0, 0, 0, True)
+    if t < duration:
+        return bed_gait(t, duration, 0, 0, .58)
+    return bed_gait(t - duration, .5 if home else .24, 0, 0, 0, True)
 
 
 def house_door(t, exiting=False):
     heading = house_outward if exiting else house_heading
     gait_time = t - .25
-    data = bed_gait(gait_time, house_entry_time, heading, heading, .34)
-    duck = smooth(t / .25) * (1 - smooth((gait_time - .88) / .24))
+    data = bed_gait(gait_time, house_entry_time, heading, heading, .39)
+    duck = smooth(t / .25) * (1 - smooth((gait_time - house_entry_time + .25) / .25))
     offset(data, body, dy=-.09 * duck)
     for upper, paw in legs:
         offset(data, upper, dy=.05 * duck)
@@ -959,6 +966,15 @@ clip('DrinkWater', 3.26 + blend_hold, drink_water)
 clip('LickLips', .63 + blend_hold, lick_lips)
 clip('DrinkWalkHome', 2 * turn_time + drink_walk_time + blend_hold,
      lambda t: with_water(route_walk(t, home=True, route_heading=drink_heading, distance=drink_distance)))
+
+# Use complete gait cycles at a fixed cadence for different lawn distances.
+for cycles in (4, 5, 6, 8, 9, 10, 11):
+    travel_time = cycles * period
+    clip(f'WalkToHouse{cycles}', .5 + travel_time + .24,
+         lambda t: house_walk(t, duration=travel_time))
+    clip(f'HouseWalkHome{cycles}', .5 + travel_time + .5,
+         lambda t: house_walk(t, home=True, duration=travel_time))
+
 
 gltf['buffers'][0]['byteLength'] = len(binary)
 metadata = json.dumps(gltf, separators=(',', ':')).encode()
