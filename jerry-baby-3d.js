@@ -2,6 +2,9 @@
 const scene = document.getElementById('scene');
 const canvas = document.getElementById('roomCanvas');
 let viewer;
+const testBabyEnabled = new URLSearchParams(location.search).get('babyModel') === '25k';
+let testBaby;
+let testBabyReady = false;
 let ready = false;
 let failed = false;
 let clip = '';
@@ -356,6 +359,7 @@ function lockCare(locked) {
 }
 
 function syncClothes() {
+  syncTestBaby();
   if (!wardrobe.length) return;
   const equipped = window.pawtopiaWorld?.snapshot().world?.equipped;
   for (const { material, slot, id } of wardrobe) {
@@ -363,6 +367,48 @@ function syncClothes() {
     const visible = Number(equipped?.[slot] === id);
     if (a !== visible) material.setBaseColorFactor([r, g, b, visible]);
   }
+}
+
+function syncTestBaby() {
+  if (!testBaby) return;
+  const show = viewer && !viewer.hidden && ready &&
+    scene.dataset.growthStage === 'Baby' && !canvas.classList.contains('jerry-3d-ready');
+  const equipped = window.pawtopiaWorld?.snapshot().world?.equipped;
+  const dressed = Object.values(clothing).some(({ slot, id }) => equipped?.[slot] === id);
+  const visible = Boolean(show && testBabyReady && clip === 'Idle' && !care && !dressed);
+  scene.classList.toggle('baby-test-model-visible', visible);
+  // Keep the test layer mounted while it loads, even during a care animation.
+  testBaby.hidden = !show;
+}
+
+function mountTestBaby() {
+  testBaby = document.createElement('model-viewer');
+  testBaby.id = 'jerryBabyTest3D';
+  testBaby.setAttribute('aria-hidden', 'true');
+  for (const [name, value] of Object.entries({
+    src: 'assets/models/jerry_puppy_25k_tris.glb',
+    loading: 'eager',
+    'interaction-prompt': 'none',
+    'disable-tap': '',
+    'camera-orbit': '30deg 85deg 6m',
+    'field-of-view': '30deg',
+    'min-camera-orbit': 'auto auto 6m',
+    'max-camera-orbit': 'auto auto 6m',
+    exposure: '1.05',
+    'shadow-intensity': '0.7'
+  })) testBaby.setAttribute(name, value);
+  testBaby.addEventListener('load', () => {
+    testBabyReady = true;
+    testBaby.dismissPoster();
+    syncTestBaby();
+  });
+  testBaby.addEventListener('error', () => {
+    testBabyReady = false;
+    syncTestBaby();
+    testBaby.remove();
+    testBaby = undefined;
+  });
+  scene.prepend(testBaby);
 }
 
 function wetFur(amount) {
@@ -392,6 +438,7 @@ async function play(name) {
   const request = ++playbackRequest;
   const target = viewer;
   clip = name;
+  syncTestBaby();
   const sleeping = care?.action === 'sleep' && name !== 'Idle';
   const visitingHouse = care?.action === 'house' && name !== 'Idle';
   const feeding = care?.action === 'feed' && name !== 'Idle';
@@ -665,6 +712,7 @@ function sync() {
       syncClothes();
       ready = true;
       viewer.dismissPoster();
+      if (testBabyEnabled && !testBaby) mountTestBaby();
       sync();
       if (!care && viewer.availableAnimations?.includes('Idle')) idle();
     });
@@ -716,6 +764,7 @@ function sync() {
     }
   }
   scene.classList.toggle('jerry-baby-3d-ready', show && ready);
+  syncTestBaby();
 }
 
 scene.addEventListener('pawtopia-jerry-action', event => {
@@ -751,6 +800,7 @@ scene.addEventListener('pawtopia-jerry-action', event => {
   if (finishMeal || finishSleep) event.preventDefault();
   clearTimeout(walkTimer);
   care = { ...config, action, origin, finishMeal, finishSleep, index: 0, state: 'WaitingForRoom' };
+  syncTestBaby();
   if (action === 'house' && origin === 'garden' && ready) {
     care.houseStart = gardenPose(true);
   }

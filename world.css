@@ -277,16 +277,18 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-bathroom{--baby-center:53%;--baby-floor:29%;--baby-viewport:65%}
 .room-garden{--baby-center:60%;--baby-floor:24%;--baby-viewport:70%}
 #scene.jerry-baby-3d-ready #roomJerry[data-stage="Baby"]{visibility:hidden}
-#jerryBaby3D{
+:is(#jerryBaby3D,#jerryBabyTest3D){
  position:absolute;z-index:2;left:calc(var(--baby-center) - var(--baby-viewport, 37%) / 2);width:var(--baby-viewport, 37%);height:18.3%;
  bottom:calc(var(--baby-floor) - 3.6%);background:transparent;pointer-events:none;
  --poster-color:transparent;visibility:visible;opacity:0;transform-origin:50% 80.4%;scale:1.875;
 }
-#jerryBaby3D[hidden]{display:none}
-#scene.jerry-baby-3d-ready #jerryBaby3D{visibility:visible;opacity:1}
+:is(#jerryBaby3D,#jerryBabyTest3D)[hidden]{display:none}
+#scene.jerry-baby-3d-ready #jerryBaby3D,
+#scene.baby-test-model-visible #jerryBabyTest3D{visibility:visible;opacity:1}
+#scene.baby-test-model-visible #jerryBaby3D{opacity:0}
 
 /* Render at the bedroom's displayed size so the face stays sharp. */
-.room-bedroom #jerryBaby3D{
+.room-bedroom :is(#jerryBaby3D,#jerryBabyTest3D){
  left:calc(var(--baby-center) - var(--baby-viewport) * .9375);
  width:calc(var(--baby-viewport) * 1.875);height:34.3125%;
  bottom:calc(var(--baby-floor) - 6.73875%);scale:1;
@@ -341,7 +343,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-garden{--garden-art:url('./assets/rooms/Garden.png')}
 .room-garden:has(> #scene.jerry-baby-3d-ready){--garden-art:url('./assets/rooms/Garden-Baby.webp')}
 .room-canvas.room-garden{background-image:var(--garden-art);background-size:100% 100%}
-.room-garden #jerryBaby3D{
+.room-garden :is(#jerryBaby3D,#jerryBabyTest3D){
  left:calc(var(--garden-rest-x, var(--baby-center)) - var(--baby-viewport) / 2);
  top:calc(var(--garden-rest-y, 76.0132%) - 14.7132%);bottom:auto;
  scale:var(--garden-rest-scale, 1.875);
