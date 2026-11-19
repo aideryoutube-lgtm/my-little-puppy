@@ -2,9 +2,10 @@
 const scene = document.getElementById('scene');
 const canvas = document.getElementById('roomCanvas');
 let viewer;
-const testBabyEnabled = new URLSearchParams(location.search).get('babyModel') === '25k';
+const testBabyEnabled = new URLSearchParams(location.search).get('babyModel') !== 'legacy';
 let testBaby;
 let testBabyReady = false;
+let testBabyFailed = false;
 let ready = false;
 let failed = false;
 let clip = '';
@@ -371,11 +372,10 @@ function syncClothes() {
 
 function syncTestBaby() {
   if (!testBaby) return;
-  const show = viewer && !viewer.hidden && ready &&
-    scene.dataset.growthStage === 'Baby' && !canvas.classList.contains('jerry-3d-ready');
-  const equipped = window.pawtopiaWorld?.snapshot().world?.equipped;
+  const show = scene.dataset.growthStage === 'Baby' && !canvas.classList.contains('jerry-3d-ready');
+  const equipped = window.pawtopiaWorld?.snapshot?.()?.world?.equipped;
   const dressed = Object.values(clothing).some(({ slot, id }) => equipped?.[slot] === id);
-  const visible = Boolean(show && testBabyReady && clip === 'Idle' && !care && !dressed);
+  const visible = Boolean(show && testBabyReady && (!ready || clip === 'Idle') && !care && !dressed);
   scene.classList.toggle('baby-test-model-visible', visible);
   // Keep the test layer mounted while it loads, even during a care animation.
   testBaby.hidden = !show;
@@ -404,6 +404,7 @@ function mountTestBaby() {
   });
   testBaby.addEventListener('error', () => {
     testBabyReady = false;
+    testBabyFailed = true;
     syncTestBaby();
     testBaby.remove();
     testBaby = undefined;
@@ -686,6 +687,7 @@ function idle() {
 function sync() {
   const isBaby = scene.dataset.growthStage === 'Baby';
   const show = isBaby && !canvas.classList.contains('jerry-3d-ready');
+  if (show && testBabyEnabled && !testBaby && !testBabyFailed) mountTestBaby();
   if (show && !viewer && !failed) {
     viewer = document.createElement('model-viewer');
     viewer.id = 'jerryBaby3D';
@@ -712,7 +714,6 @@ function sync() {
       syncClothes();
       ready = true;
       viewer.dismissPoster();
-      if (testBabyEnabled && !testBaby) mountTestBaby();
       sync();
       if (!care && viewer.availableAnimations?.includes('Idle')) idle();
     });

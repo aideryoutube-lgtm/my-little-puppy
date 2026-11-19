@@ -769,3 +769,34 @@ test('Real action buttons complete each care route from every permitted room', a
     }
   }
 });
+
+test('New Baby loads on its own and replaces the still when the animated model fails', async t => {
+  const { window } = new JSDOM(
+    '<div id="roomCanvas" class="room-living"><div id="scene" data-growth-stage="Baby"></div></div>',
+    { runScripts: 'outside-only', url: 'https://preview.example/?babyModel=25k' },
+  );
+  t.after(() => window.close());
+  window.HTMLElement.prototype.dismissPoster = () => {};
+  window.eval(run);
+  const scene = window.document.getElementById('scene');
+  const legacy = window.document.getElementById('jerryBaby3D');
+  const candidate = window.document.getElementById('jerryBabyTest3D');
+  assert.match(candidate.getAttribute('src'), /jerry_puppy_25k_tris\.glb$/);
+  assert.equal(candidate.hidden, false);
+
+  legacy.dispatchEvent(new window.Event('error'));
+  candidate.dispatchEvent(new window.Event('load'));
+  const visible = () => scene.classList.contains('baby-test-model-visible');
+  assert.equal(visible(), true);
+
+  for (const stage of ['Puppy', 'Adult', 'Baby']) {
+    scene.dataset.growthStage = stage;
+    await settle();
+    assert.equal(visible(), stage === 'Baby');
+    assert.equal(candidate.hidden, stage !== 'Baby');
+  }
+  candidate.dispatchEvent(new window.Event('error'));
+  await settle();
+  assert.equal(visible(), false);
+  assert.equal(window.document.getElementById('jerryBabyTest3D'), null);
+});

@@ -21,7 +21,8 @@ http.createServer((req,res)=>{
  try{pathname=decodeURIComponent(new URL(req.url,'http://localhost').pathname);}catch{res.writeHead(400);return res.end();}
  const parts=pathname.split('/').filter(Boolean);
  if(parts.some(p=>p==='..'||p.startsWith('.'))){res.writeHead(403);return res.end();}
- const target=path.resolve(root,...parts.length?parts:['index.html']);
+ const target=path.resolve(root,...(parts.length===1&&parts[0]==='jerry-baby-3d-test'
+  ? ['jerry-baby-3d-test.html'] : parts.length ? parts : ['index.html']));
  if(!target.startsWith(root+path.sep)){res.writeHead(403);return res.end();}
  const ext=path.extname(target).toLowerCase();
  if(!types[ext]){res.writeHead(404);return res.end();}

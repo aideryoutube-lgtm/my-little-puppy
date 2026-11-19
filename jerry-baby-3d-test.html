@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jerry Baby 3D Test · Pawtopia</title>
+  <style>
+    body { margin: 0; font: 1rem/1.45 system-ui, sans-serif; color: #302317; background: #fff7ea; }
+    main { max-width: 44rem; margin: auto; padding: 1rem; }
+    h1 { font-size: 1.6rem; margin: .65rem 0; }
+    a { color: #743919; }
+    model-viewer { display: block; width: 100%; height: 58vh; min-height: 240px; max-height: 520px;
+      background: #edddc6; border-radius: 1rem; --poster-color: transparent; }
+    .controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+    button { min-width: 44px; min-height: 44px; padding-inline: .8rem; font: inherit; }
+    #status { min-height: 1.45em; overflow-wrap: anywhere; }
+    #status[data-state="error"] { color: #912c20; }
+  </style>
+  <script defer src="/jerry-baby-3d-test.js"></script>
+</head>
+<body>
+  <main>
+    <a href="/?babyModel=25k">← Pawtopia Preview</a>
+    <h1>Jerry Baby 3D Test</h1>
+    <model-viewer id="jerry" alt="Jerry Baby, a Pomeranian puppy with a red collar"
+      camera-controls touch-action="none" loading="eager" interaction-prompt="none"
+      camera-orbit="30deg 85deg auto" field-of-view="32deg" shadow-intensity="0.6">
+    </model-viewer>
+    <div class="controls" aria-label="Camera controls">
+      <button type="button" data-zoom="in" disabled>Zoom in</button>
+      <button type="button" data-zoom="out" disabled>Zoom out</button>
+    </div>
+    <p>Drag to rotate. Pinch or use the buttons to zoom.</p>
+    <p id="status" role="status">Checking WebGL and loading the 3D viewer…</p>
+    <noscript>Enable JavaScript to load the 3D model.</noscript>
+  </main>
+</body>
+</html>
