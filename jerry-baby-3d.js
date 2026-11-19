@@ -85,27 +85,128 @@ function positionSleeping(name, time, duration) {
     (name === 'JumpUp' && progress >= .88) || (name === 'JumpDown' && progress <= .12));
 }
 // Floor anchors are normalized to the shared 941 × 1672 garden artwork.
-const gardenStart = [.60, .760132, 1];
 const houseThreshold = [789 / 941, 850 / 1672, .58];
 const houseCushion = [793 / 941, 735 / 1672, .48];
+const houseDoorHeading = -135;
+const houseTurn = .5;
+const houseWalk = 4.2;
+const gardenCamera = 30;
 
-// Timings match the four-paw gait and stationary holds in rig-jerry-baby.py.
 const houseTravel = {
-  WalkToHouse: [gardenStart, houseThreshold, .5, 4.2],
   EnterHouse: [houseThreshold, houseCushion, .25, 1.12],
   RestInside: [houseCushion, houseCushion, 0, 1],
   ExitHouse: [houseCushion, houseThreshold, .25, 1.12],
-  Stretch: [houseThreshold, houseThreshold, 0, 1],
-  HouseWalkHome: [houseThreshold, gardenStart, .5, 4.2]
+  Stretch: [houseThreshold, houseThreshold, 0, 1]
 };
 
-function positionAtHouse(name, time) {
-  const [from, to, delay, duration] = houseTravel[name];
-  const progress = Math.max(0, Math.min(1, (time - delay) / duration));
-  const [x, y, size] = from.map((value, i) => value + (to[i] - value) * progress);
-  scene.style.setProperty('--house-x', x * 100 + '%');
-  scene.style.setProperty('--house-y', y * 100 + '%');
-  scene.style.setProperty('--house-scale', 1.875 * size);
+function clampProgress(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function turnHeading(from, to, fraction) {
+  const t = clampProgress(fraction);
+  const difference = ((to - from + 180) % 360 + 360) % 360 - 180;
+  return from + difference * t * t * (3 - 2 * t);
+}
+
+function setGardenHeading(heading) {
+  if (!viewer.jumpCameraToGoal) return;
+  const orbit = `${gardenCamera - heading}deg 85deg 6m`;
+  if (viewer.cameraOrbit === orbit) return;
+  viewer.cameraOrbit = orbit;
+  viewer.jumpCameraToGoal();
+}
+
+// Walk carries its own root displacement. Sample the same floor path as the
+// rig when House interrupts a stroll, then move that offset into the 2D layer.
+function gardenPose(includeStroll) {
+  const room = scene.getBoundingClientRect();
+  const model = viewer.getBoundingClientRect();
+  const style = getComputedStyle(viewer);
+  const scale = parseFloat(style.scale) || 1.875;
+  if (!room.width || !room.height) {
+    return { point: [parseFloat(style.getPropertyValue('--baby-center') || '60%') / 100,
+      1 - parseFloat(style.getPropertyValue('--baby-floor') || '24%') / 100 + .000132, scale / 1.875],
+      heading: 0 };
+  }
+  const point = [(model.left + model.width / 2 - room.left) / room.width,
+    (model.top + model.height * .804 - room.top) / room.height, scale / 1.875];
+  if (!includeStroll || clip !== 'Walk' || !viewer.getCameraOrbit) return { point, heading: 0 };
+
+  // These are the two passes and two turns in rig-jerry-baby.py's Walk.
+  const pass = 1.72;
+  const turn = .64;
+  const time = viewer.currentTime;
+  const direction = 1.05;
+  const degrees = direction * 180 / Math.PI;
+  const strollTurn = (start, fraction) => {
+    const t = clampProgress(fraction);
+    return start + 180 * t * t * (3 - 2 * t);
+  };
+  let distance;
+  let heading;
+  if (time < pass) {
+    distance = .51 * time / pass;
+    heading = degrees;
+  } else if (time < pass + turn) {
+    distance = .51;
+    heading = strollTurn(degrees, (time - pass) / turn);
+  } else if (time < 2 * pass + turn) {
+    distance = .51 * (1 - (time - pass - turn) / pass);
+    heading = degrees - 180;
+  } else {
+    distance = 0;
+    heading = strollTurn(degrees + 180, (time - 2 * pass - turn) / turn);
+  }
+
+  const camera = viewer.getCameraOrbit();
+  const target = viewer.getCameraTarget();
+  const focal = model.height / (2 * Math.tan(viewer.getFieldOfView() * Math.PI / 360));
+  function projectGround(travel) {
+    const x = travel * Math.sin(direction) - target.x;
+    const y = -.85 - target.y;
+    const z = travel * Math.cos(direction) - target.z;
+    const depth = x * Math.sin(camera.theta) + z * Math.cos(camera.theta);
+    const ratio = focal / (camera.radius - depth * Math.sin(camera.phi) - y * Math.cos(camera.phi));
+    return [ratio * (x * Math.cos(camera.theta) - z * Math.sin(camera.theta)),
+      ratio * (depth * Math.cos(camera.phi) - y * Math.sin(camera.phi))];
+  }
+  const [x, y] = projectGround(distance);
+  const [baseX, baseY] = projectGround(0);
+  point[0] += (x - baseX) / room.width;
+  point[1] += (y - baseY) / room.height;
+  return { point, heading };
+}
+
+function setGardenPoint(prefix, [x, y, size]) {
+  scene.style.setProperty(`--${prefix}-x`, x * 100 + '%');
+  scene.style.setProperty(`--${prefix}-y`, y * 100 + '%');
+  scene.style.setProperty(`--${prefix}-scale`, 1.875 * size);
+}
+
+function positionAtHouse(name, time, clipDuration) {
+  const outward = name === 'WalkToHouse';
+  const lawn = outward || name === 'HouseWalkHome';
+  const start = care.houseStart.point;
+  const [from, to, delay, duration] = lawn ?
+    [outward ? start : houseThreshold, outward ? houseThreshold : start, houseTurn, houseWalk] :
+    houseTravel[name];
+  const progress = time >= clipDuration ? 1 : clampProgress((time - delay) / duration);
+  // Advance at constant ground speed. The artwork's near end projects more
+  // pixels per step, so interpolate the fixed floor anchors in perspective.
+  const travel = progress * to[2] / (from[2] + (to[2] - from[2]) * progress);
+  setGardenPoint('house', from.map((value, i) => value + (to[i] - value) * travel));
+  if (lawn) {
+    const initial = outward ? care.houseStart.heading : houseDoorHeading + 180;
+    const final = outward ? houseDoorHeading : 0;
+    const forward = care.houseHeading + (outward ? 0 : 180);
+    const heading = time < houseTurn ? turnHeading(initial, forward, time / houseTurn) :
+      turnHeading(forward, final, (time - houseTurn - houseWalk) / (outward ? .24 : .5));
+    setGardenHeading(heading);
+  } else {
+    // The doorway, rest and stretch clips already carry their heading.
+    setGardenHeading(0);
+  }
   const depth = name === 'RestInside' ? 1 :
     name === 'EnterHouse' ? progress : name === 'ExitHouse' ? 1 - progress : 0;
   // Bring the overlaid wall forward as Jerry crosses the threshold.
@@ -299,7 +400,7 @@ async function play(name) {
   const sequenceClip = Boolean(care && name !== 'Idle');
   const feeding = sequenceClip && care.action === 'feed';
   if (feeding) positionFeeding(name, 0);
-  if (visitingHouse) positionAtHouse(name, 0);
+  if (visitingHouse) positionAtHouse(name, 0, target.duration);
   if (sequenceClip) target.currentTime = 0;
   target.play(name === 'Idle' || (sequenceClip && !feeding && !sleeping && !visitingHouse) ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
@@ -345,7 +446,7 @@ async function play(name) {
         }
       }
       if (visitingHouse) {
-        positionAtHouse(name, time);
+        positionAtHouse(name, time, target.duration);
         if (time >= target.duration) {
           advanceCare();
           return;
@@ -420,6 +521,10 @@ function stopCare(reason, restoreRoom = false) {
   const meal = care?.action === 'feed' && care;
   const sleeping = care?.action === 'sleep';
   if (care?.action === 'house') {
+    if (reason === 'completed' && origin === 'garden') {
+      setGardenPoint('garden-rest', care.houseStart.point);
+    }
+    setGardenHeading(0);
     scene.classList.remove('baby-house-route', 'baby-house-occluded');
     for (const property of ['--house-x', '--house-y', '--house-scale', '--house-wall-depth']) {
       scene.style.removeProperty(property);
@@ -469,6 +574,15 @@ function startCare() {
   if (missing.length) return stopCare('Missing clips: ' + missing.join(', '), true);
   if (roomBlocked()) return stopCare('Room is covered by a dialog or decor editor', true);
   if (care.route && !clearCareRoute(care.route)) return stopCare('Decoration in the walking path', true);
+  if (care.action === 'house') {
+    care.houseStart ??= gardenPose(false);
+    const [x, y] = care.houseStart.point;
+    // The floor recedes towards the arch. Account for the portrait artwork
+    // and use a shallower projected forward component along that depth axis.
+    care.houseHeading = gardenCamera + Math.atan2(
+      (houseThreshold[0] - x) * 941, (houseThreshold[1] - y) * 1672 * .38
+    ) * 180 / Math.PI;
+  }
   if (care.action === 'feed') setFoodLevel(1);
   playCareClip();
 }
@@ -509,7 +623,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=10',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=11',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',
@@ -566,6 +680,9 @@ function sync() {
   if (viewer) {
     const room = roomName();
     const changed = viewer.hidden === show || currentRoom !== room;
+    if (currentRoom === 'garden' && room !== 'garden') {
+      for (const axis of ['x', 'y', 'scale']) scene.style.removeProperty('--garden-rest-' + axis);
+    }
     currentRoom = room;
     viewer.hidden = !show;
     if (!show && changed) {
@@ -613,6 +730,9 @@ scene.addEventListener('pawtopia-jerry-action', event => {
   if (finishMeal || finishSleep) event.preventDefault();
   clearTimeout(walkTimer);
   care = { ...config, action, origin, finishMeal, finishSleep, index: 0, state: 'WaitingForRoom' };
+  if (action === 'house' && origin === 'garden' && ready) {
+    care.houseStart = gardenPose(true);
+  }
   lockCare(true);
   careDebug('WaitingForRoom: ' + action + ' in ' + config.room);
   if (origin !== config.room) {

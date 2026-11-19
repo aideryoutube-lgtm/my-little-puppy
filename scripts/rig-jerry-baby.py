@@ -823,21 +823,18 @@ def solid(points, faces):
 # follows the painted doorway in screen space using these phase timings.
 house_heading = math.radians(-135)
 house_outward = house_heading + math.pi
-house_lawn_heading = math.radians(170)
-house_return_heading = house_lawn_heading - math.pi
 house_walk_time = 4.2
 house_entry_time = 1.12
 
 
 def house_walk(t, home=False):
-    start, heading = (house_outward, house_return_heading) if home else (0, house_lawn_heading)
+    # Garden camera azimuth supplies the heading for the live start point.
     if t < .5:
-        return bed_gait(t, .5, start, heading, 0, True)
+        return bed_gait(t, .5, 0, 0, 0, True)
     t -= .5
     if t < house_walk_time:
-        return bed_gait(t, house_walk_time, heading, heading, .68)
-    end, turn = (0, .5) if home else (house_heading + math.tau, .24)
-    return bed_gait(t - house_walk_time, turn, heading, end, 0, True)
+        return bed_gait(t, house_walk_time, 0, 0, .44)
+    return bed_gait(t - house_walk_time, .5 if home else .24, 0, 0, 0, True)
 
 
 def house_door(t, exiting=False):
