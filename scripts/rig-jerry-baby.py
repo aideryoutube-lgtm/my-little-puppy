@@ -120,9 +120,16 @@ for center_x in (-.166, .166):
 jaw = np.zeros_like(vertices)
 jaw_region = ((x / .20)**2 + ((y - .055) / .105)**2)
 jaw[:, 1] = -.095 * (1 - blend(jaw_region, .35, 1)) * blend(z, .56, .76)
+# Carry the underweighted back of the skull and ruff into the feeding bow.
+# Fade out toward the shoulders, tail, ears and muzzle.
+feeding_ruff = np.zeros_like(vertices)
+ruff = (blend(y, -.19, .14) * (1 - blend(y, .49, .66)) *
+        blend(z, -.48, -.20) * (1 - blend(z, .10, .38)) * (1 - head_weight))
+feeding_ruff[:, 1] = -.28 * ruff
+feeding_ruff[:, 2] = .14 * ruff
 primitive['targets'] = [dict(POSITION=add_accessor(target, 'VEC3', bounds=True))
-                        for target in (eyelid, jaw)]
-gltf['meshes'][0].update(weights=[0, 0], extras={'targetNames': ['Blink', 'Chew']})
+                        for target in (eyelid, jaw, feeding_ruff)]
+gltf['meshes'][0].update(weights=[0, 0, 0], extras={'targetNames': ['Blink', 'Chew', 'FeedingRuff']})
 gltf['animations'] = []
 
 
@@ -141,8 +148,8 @@ def clip(name, duration, pose):
         kind = {'rotation': 'VEC4', 'translation': 'VEC3', 'scale': 'VEC3', 'weights': 'SCALAR'}[prop]
         values = [frame[joint, prop] for frame in frames]
         if prop == 'weights':
-            values = [value if isinstance(value, tuple) else (value, 0) for value in values]
-            values = [weight for pair in values for weight in pair]
+            values = [value if isinstance(value, tuple) else (value, 0, 0) for value in values]
+            values = [weight for morph_weights in values for weight in morph_weights]
         output = add_accessor(values, kind)
         channels.append(dict(sampler=len(samplers), target=dict(node=joint, path=prop)))
         samplers.append(dict(input=input_accessor, output=output, interpolation='LINEAR'))
@@ -368,10 +375,10 @@ def eat(t):
     data[head, 'rotation'] = quaternion(0, .38 * lowering + .055 * chewing - .15 * lick)
     data[tongue, 'scale'] = [lick] * 3
     data[tongue, 'translation'] = [0, -.025 + .045 * lick, .49 + .062 * lick]
-    data[0, 'weights'] = (.65 * lick, chewing)
+    data[0, 'weights'] = (.65 * lick, chewing, lowering)
     # Relax the curled tail behind the rump as Jerry lowers his head.
     tail_relax = smooth(t / .62) * (1 - smooth((t - 4.0) / .48))
-    pitch = -.55 * tail_relax / 2
+    pitch = -.75 * tail_relax / 2
     yaw = .58 * wag * math.sin(math.tau * 4.5 * t) / 2
     data[tail, 'rotation'] = [
         math.sin(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw),

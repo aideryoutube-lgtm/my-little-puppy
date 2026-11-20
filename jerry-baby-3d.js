@@ -28,7 +28,7 @@ const feedTurn = .48;
 const feedWalk = 5 * .58; // Five planted-paw cycles in rig-jerry-baby.py.
 const feedArrival = feedTurn + feedWalk;
 // model-viewer 4.1 applies timeScale to both the mixer and the selected action.
-const feedApproachSpeed = Math.sqrt(2.8);
+const feedApproachSpeed = Math.sqrt(1.65);
 const biteEnds = [1.21, 2.09, 2.97, 3.85];
 const sleepStates = {
   ApproachBed: 'WalkingToBed', Crouch: 'PreparingToJump', JumpUp: 'Jumping',
@@ -698,7 +698,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=13',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=14',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',

@@ -87,7 +87,7 @@ test('Animated Baby has a weighted skin, blink and chew morphs and all care clip
     assert.equal(gltf.accessors[mesh.attributes[key]].count,
       gltf.accessors[mesh.attributes.POSITION].count);
   }
-  assert.deepEqual(gltf.meshes[0].extras.targetNames, ['Blink', 'Chew']);
+  assert.deepEqual(gltf.meshes[0].extras.targetNames, ['Blink', 'Chew', 'FeedingRuff']);
   assert.deepEqual(gltf.animations.map(clip => clip.name), [
     'Idle', 'Walk', 'Happy', 'WalkToBowl', 'Eat', 'WalkHome',
     'ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome',
@@ -150,9 +150,9 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     assert(channel, clip + ' must animate ' + gltf.nodes[node].name + ' ' + channelPath);
     const accessor = gltf.accessors[animation.samplers[channel.sampler].output];
     const view = gltf.bufferViews[accessor.bufferView];
-    const width = channelPath === 'weights' ? 2 : { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type];
+    const width = channelPath === 'weights' ? gltf.meshes[0].weights.length : { SCALAR: 1, VEC3: 3, VEC4: 4 }[accessor.type];
     const start = 28 + length + (view.byteOffset || 0) + (accessor.byteOffset || 0);
-    return Array.from({length: channelPath === 'weights' ? accessor.count / 2 : accessor.count}, (_, frame) =>
+    return Array.from({length: channelPath === 'weights' ? accessor.count / width : accessor.count}, (_, frame) =>
       Array.from({length: width}, (_, axis) => file.readFloatLE(start + (frame * width + axis) * 4)));
   }
   const approach = samples('WalkToBowl', ground, 'translation');
@@ -174,6 +174,12 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   assert(tailDuringMeal.at(-1).every((value, axis) => value === returnTail[axis]));
   assert(samples('Eat', 0, 'weights').some(([, chew]) => chew > .75));
   assert(samples('Idle', 0, 'weights').every(([, chew]) => chew === 0));
+  for (const name of Object.keys(clips)) {
+    const ruff = samples(name, 0, 'weights').map(weights => weights[2]);
+    assert.equal(ruff[0], 0);
+    assert.equal(ruff.at(-1), 0);
+    assert.equal(Math.max(...ruff), name === 'Eat' ? 1 : 0);
+  }
   assert(samples('Eat', named.Tongue, 'scale').some(key => key[0] > 0));
   assert(!gltf.skins[0].joints.includes(named.Tongue));
   for (const name of Object.keys(named).filter(name => name.endsWith('paw'))) {
@@ -240,7 +246,7 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
   assert(samples('Sleep', 0, 'weights').every(([weight]) => weight === 1));
   const breath = samples('Sleep', named.Torso, 'translation');
   assert(breath.some(([, height]) => height > breath[0][1]));
-  assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0, 0]);
+  assert.deepEqual(samples('WakeUp', 0, 'weights').at(-1), [0, 0, 0]);
 
   for (const name of ['Bath water', 'Bath foam', 'Bath droplet 1']) {
     assert.deepEqual(gltf.nodes[named[name]].scale, [0, 0, 0]);
@@ -714,7 +720,7 @@ test('Real action buttons complete each care route from every permitted room', a
       for (const clip of clips) {
         assert.equal(room(), destination ?? origin);
         assert.equal(played.at(-1), clip);
-        assert.equal(viewer.timeScale, clip === 'WalkToBowl' ? Math.sqrt(2.8) : 1);
+        assert.equal(viewer.timeScale, clip === 'WalkToBowl' ? Math.sqrt(1.65) : 1);
         assert($('#scene').hasAttribute('data-care-busy'));
         // Safari suppresses frames while the page is in the background.
         for (const visibility of [true, false]) {
