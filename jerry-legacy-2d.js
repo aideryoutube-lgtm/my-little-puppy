@@ -25,6 +25,8 @@
     request.video.remove();
     request.video.removeAttribute('src');
     request.video.load();
+    request.download?.abort();
+    if (request.objectURL) URL.revokeObjectURL(request.objectURL);
     scene.classList.remove('jerry-video-playing');
     scene.removeAttribute('data-care-busy');
     buttons.forEach(button => { button.disabled = false; });
@@ -67,10 +69,26 @@
       video.addEventListener('ended', () => finish(request, 'completed'), {once:true});
       video.addEventListener('error', () => finish(request, 'error'), {once:true});
       const folder = (silent[stage]?.includes(action) ? 'silent/' : '') + stage.toLowerCase();
-      video.src = 'assets/videos/' + folder + '/' + file;
+      const source = 'assets/videos/' + folder + '/' + file;
       scene.append(video);
       request.timer = setTimeout(() => finish(request, 'error'), 15000);
-      video.play()?.catch(() => finish(request, 'error'));
+      function start(url) {
+        video.src = url;
+        video.play()?.catch(() => finish(request, 'error'));
+      }
+      if (stage === 'Baby' && action === 'dress') {
+        // WebKit can stall on the original clip's HTTP stream even when
+        // buffered. Play the same bytes from memory instead.
+        request.download = new AbortController();
+        fetch(source, { signal: request.download.signal }).then(response => {
+          if (!response.ok) throw new Error('Video download failed');
+          return response.blob();
+        }).then(blob => {
+          if (active !== request) return;
+          request.objectURL = URL.createObjectURL(blob);
+          start(request.objectURL);
+        }).catch(() => finish(request, 'error'));
+      } else start(source);
       return true;
     }
   };

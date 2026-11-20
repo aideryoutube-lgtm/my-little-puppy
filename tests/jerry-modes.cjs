@@ -21,12 +21,24 @@ const controls = {
 };
 
 for (const [stage, xp] of [['Baby', 0], ['Puppy', 100], ['Adult', 300]]) {
-  test(stage + ' routes all 2D controls to the correct original files', t => {
+  test(stage + ' routes all 2D controls to the correct original files', async t => {
     const {w, $, click, events} = setup(t, xp);
+    let downloaded;
+    w.fetch = async path => {
+      downloaded = path;
+      return { ok: true, blob: async () => new w.Blob() };
+    };
+    w.URL.createObjectURL = () => 'blob:video';
+    w.URL.revokeObjectURL = () => {};
     for (const [button, name] of Object.entries(controls)) {
       click('#' + button);
       const video = $('#jerryLegacyClip');
-      const src = video.getAttribute('src');
+      const downloadedDress = stage === 'Baby' && name === 'Dress';
+      if (downloadedDress) {
+        await new Promise(resolve => setImmediate(resolve));
+        assert.equal(video.getAttribute('src'), 'blob:video');
+      }
+      const src = downloadedDress ? downloaded : video.getAttribute('src');
       assert.match(src, new RegExp('^assets/videos/(?:silent/)?' + stage.toLowerCase() + '/Jerry_' + stage + '_' + name));
       assert(fs.existsSync(src));
       assert.equal(video.playsInline, true);
@@ -69,4 +81,24 @@ test('mode and room switches cancel playback; stale media events cannot award an
   assert.equal(save().xp, 100);
   assert.equal(save().coins, before.coins);
   assert.equal(w.localStorage.getItem('pawtopia-jerry-display-mode'), '2d');
+});
+
+test('switching modes aborts the Dress download and discards a late response', async t => {
+  const { w, $, click } = setup(t, 0);
+  let resolveDownload;
+  let signal;
+  w.fetch = (path, options) => {
+    signal = options.signal;
+    return new Promise(resolve => { resolveDownload = resolve; });
+  };
+  w.URL.createObjectURL = () => assert.fail('Cancelled download should never start playing');
+  click('#dress');
+  assert($('#jerryLegacyClip'));
+  click('[data-jerry-mode="3d"]');
+  assert(signal.aborted);
+  assert.equal($('#jerryLegacyClip'), null);
+  resolveDownload({ ok: true, blob: async () => new w.Blob() });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal($('#jerryLegacyClip'), null);
+  assert.equal($('#dress').disabled, false);
 });
