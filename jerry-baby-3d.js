@@ -372,7 +372,7 @@ function syncClothes() {
 
 function syncTestBaby() {
   if (!testBaby) return;
-  const show = scene.dataset.growthStage === 'Baby' && !canvas.classList.contains('jerry-3d-ready');
+  const show = scene.dataset.growthStage === 'Baby' && window.pawtopiaJerryMode !== '2d' && !canvas.classList.contains('jerry-3d-ready');
   const equipped = window.pawtopiaWorld?.snapshot?.()?.world?.equipped;
   const dressed = Object.values(clothing).some(({ slot, id }) => equipped?.[slot] === id);
   const visible = Boolean(show && testBabyReady && (!ready || clip === 'Idle') && !care && !dressed);
@@ -686,7 +686,7 @@ function idle() {
 
 function sync() {
   const isBaby = scene.dataset.growthStage === 'Baby';
-  const show = isBaby && !canvas.classList.contains('jerry-3d-ready');
+  const show = isBaby && window.pawtopiaJerryMode !== '2d' && !canvas.classList.contains('jerry-3d-ready');
   if (show && testBabyEnabled && !testBaby && !testBabyFailed) mountTestBaby();
   if (show && !viewer && !failed) {
     viewer = document.createElement('model-viewer');
@@ -837,6 +837,7 @@ new MutationObserver(syncMotion).observe(document.documentElement, {
   attributes: true, attributeFilter: ['data-effects']
 });
 
+document.addEventListener('pawtopia-jerry-mode-change', () => { if (care) stopCare('Display mode changed', true); sync(); });
 const observer = new MutationObserver(sync);
 observer.observe(scene, { attributes: true, attributeFilter: ['class', 'data-growth-stage'] });
 observer.observe(canvas, { attributes: true, attributeFilter: ['class'] });
