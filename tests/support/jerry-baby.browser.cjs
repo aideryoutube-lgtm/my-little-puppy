@@ -9,7 +9,7 @@ const actions = [
   ['#sleep', ['ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome']],
   ['#bath', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
   ['#ball', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
-  ['#home', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome']],
+  ['#home', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'HouseWalkHome']],
   ['[data-kitchen-water]', ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome']],
   ['[data-dress-item="baby-blue-shirt"]', ['DressTurn']],
   ['#portrait', ['Happy']],

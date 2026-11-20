@@ -844,25 +844,28 @@ def solid(points, faces):
 # follows the painted doorway in screen space using these phase timings.
 house_heading = math.radians(210)
 house_outward = house_heading + math.pi
-house_walk_time = 7 * period
+house_walk_time = 2 * period
+house_turn_time = .28
+house_align_time = .22
+house_duck_time = .12
 house_entry_time = period * 3
 
 
-def house_walk(t, home=False, duration=house_walk_time):
+def house_walk(t, duration=house_walk_time):
     # Garden camera azimuth supplies the heading for the live start point.
-    if t < .5:
-        return bed_gait(t, .5, 0, 0, 0, True)
-    t -= .5
+    if t < house_turn_time:
+        return bed_gait(t, house_turn_time, 0, 0, 0, True)
+    t -= house_turn_time
     if t < duration:
         return bed_gait(t, duration, 0, 0, .58)
-    return bed_gait(t - duration, .5 if home else .24, 0, 0, 0, True)
+    return bed_gait(t - duration, house_align_time, 0, 0, 0, True)
 
 
 def house_door(t, exiting=False):
     heading = house_outward if exiting else house_heading
-    gait_time = t - .25
+    gait_time = t - house_duck_time
     data = bed_gait(gait_time, house_entry_time, heading, heading, .39)
-    duck = smooth(t / .25) * (1 - smooth((gait_time - house_entry_time + .25) / .25))
+    duck = smooth(t / house_duck_time) * (1 - smooth((gait_time - house_entry_time + .25) / .25))
     offset(data, body, dy=-.09 * duck)
     for upper, paw in legs:
         offset(data, upper, dy=.05 * duck)
@@ -899,12 +902,12 @@ def house_stretch(t):
     return data
 
 
-clip('WalkToHouse', .5 + house_walk_time + .24, house_walk)
-clip('EnterHouse', .25 + house_entry_time, house_door)
+clip('WalkToHouse', house_turn_time + house_walk_time + house_align_time, house_walk)
+clip('EnterHouse', house_duck_time + house_entry_time, house_door)
 clip('RestInside', .58 + 3.54, house_rest)
-clip('ExitHouse', .25 + house_entry_time, lambda t: house_door(t, exiting=True))
+clip('ExitHouse', house_duck_time + house_entry_time, lambda t: house_door(t, exiting=True))
 clip('Stretch', 1.28, house_stretch)
-clip('HouseWalkHome', .5 + house_walk_time + .5, lambda t: house_walk(t, home=True))
+clip('HouseWalkHome', house_turn_time + house_walk_time + house_align_time, house_walk)
 
 
 def annulus(inner, outer, low, high):
@@ -982,12 +985,12 @@ clip('DrinkWalkHome', 2 * turn_time + drink_walk_time + blend_hold,
      lambda t: with_water(route_walk(t, home=True, route_heading=drink_heading, distance=drink_distance)))
 
 # Use complete gait cycles at a fixed cadence for different lawn distances.
-for cycles in (4, 5, 6, 8, 9, 10, 11):
+for cycles in range(3, 12):
     travel_time = cycles * period
-    clip(f'WalkToHouse{cycles}', .5 + travel_time + .24,
+    clip(f'WalkToHouse{cycles}', house_turn_time + travel_time + house_align_time,
          lambda t: house_walk(t, duration=travel_time))
-    clip(f'HouseWalkHome{cycles}', .5 + travel_time + .5,
-         lambda t: house_walk(t, home=True, duration=travel_time))
+    clip(f'HouseWalkHome{cycles}', house_turn_time + travel_time + house_align_time,
+         lambda t: house_walk(t, duration=travel_time))
 
 
 gltf['buffers'][0]['byteLength'] = len(binary)

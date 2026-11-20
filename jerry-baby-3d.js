@@ -91,20 +91,20 @@ function positionSleeping(name, time, duration) {
     (name === 'JumpUp' && progress >= .88) || (name === 'JumpDown' && progress <= .12));
 }
 // Floor anchors are normalized to the shared 941 × 1672 garden artwork.
+const gardenArrival = [700 / 941, 853 / 1672, .75];
 const houseThreshold = [792 / 941, 771 / 1672, .60];
-const houseCushion = [792 / 941, 699 / 1672, .49];
+const houseInterior = [792 / 941, 594 / 1672, .43];
 const houseDoorHeading = 210;
 const houseEntryTime = 3 * .58;
-const houseTurn = .5;
+const houseTurn = .28;
 const houseStrideTime = .58;
-const houseStrides = 7;
+const houseStrides = 2;
 const gardenCamera = 30;
 
 const houseTravel = {
-  EnterHouse: [houseThreshold, houseCushion, .25, houseEntryTime],
-  RestInside: [houseCushion, houseCushion, 0, 1],
-  ExitHouse: [houseCushion, houseThreshold, .25, houseEntryTime],
-  Stretch: [houseThreshold, houseThreshold, 0, 1]
+  EnterHouse: [houseThreshold, houseInterior, .12, houseEntryTime],
+  RestInside: [houseInterior, houseInterior, 0, 1],
+  ExitHouse: [houseInterior, houseThreshold, .12, houseEntryTime]
 };
 
 function clampProgress(value) {
@@ -132,11 +132,7 @@ function gardenPose(includeStroll) {
   const model = viewer.getBoundingClientRect();
   const style = getComputedStyle(viewer);
   const scale = parseFloat(style.scale) || 1.875;
-  if (!room.width || !room.height) {
-    return { point: [parseFloat(style.getPropertyValue('--baby-center') || '60%') / 100,
-      1 - parseFloat(style.getPropertyValue('--baby-floor') || '24%') / 100 + .000132, scale / 1.875],
-      heading: 0 };
-  }
+  if (!room.width || !room.height) return { point: gardenArrival, heading: 0 };
   const point = [(model.left + model.width / 2 - room.left) / room.width,
     (model.top + model.height * .804 - room.top) / room.height, scale / 1.875];
   if (!includeStroll || clip !== 'Walk' || !viewer.getCameraOrbit) return { point, heading: 0 };
@@ -203,17 +199,24 @@ function positionAtHouse(name, time, clipDuration) {
   const progress = time >= clipDuration ? 1 : clampProgress((time - delay) / duration);
   // Advance at constant ground speed. The artwork's near end projects more
   // pixels per step, so interpolate the fixed floor anchors in perspective.
-  const travel = progress * to[2] / (from[2] + (to[2] - from[2]) * progress);
+  // Ease into and out of each leg over the same interval as the rig's
+  // stance transition. The middle of each leg maintains constant cadence.
+  const ramp = Math.min(.12 / duration, .5);
+  const distance = progress < ramp ? progress ** 2 / (2 * ramp) :
+    progress > 1 - ramp ? 1 - ramp - (1 - progress) ** 2 / (2 * ramp) :
+    progress - ramp / 2;
+  const paced = distance / (1 - ramp);
+  const travel = paced * to[2] / (from[2] + (to[2] - from[2]) * paced);
   setGardenPoint('house', from.map((value, i) => value + (to[i] - value) * travel));
   if (lawn) {
     const initial = outward ? care.houseStart.heading : houseDoorHeading + 180;
     const final = outward ? houseDoorHeading : 0;
     const forward = care.houseHeading + (outward ? 0 : 180);
     const heading = time < houseTurn ? turnHeading(initial, forward, time / houseTurn) :
-      turnHeading(forward, final, (time - houseTurn - walkTime) / (outward ? .24 : .5));
+      turnHeading(forward, final, (time - houseTurn - walkTime) / .22);
     setGardenHeading(heading);
   } else {
-    // The doorway, rest and stretch clips already carry their heading.
+    // The doorway and rest clips already carry their heading.
     setGardenHeading(0);
   }
   const depth = name === 'RestInside' ? 1 :
@@ -426,7 +429,7 @@ const careActions = {
     clips: ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome'] },
   feed: { room: 'kitchen', route: [.44, .94, .63, .78], clips: ['WalkToBowl', 'Eat', 'WalkHome'] },
   house: { room: 'garden',
-    clips: ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'] },
+    clips: ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'HouseWalkHome'] },
   drink: { room: 'kitchen', route: [.44, .95, .71, .82],
     clips: ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'] },
   sleep: { room: 'bedroom', route: [.22, .86, .28, .76],
@@ -458,8 +461,12 @@ async function play(name) {
   if (request !== playbackRequest || viewer !== target || target.hidden) return;
   const sequenceClip = Boolean(care && name !== 'Idle');
   target.timeScale = feeding && name === 'WalkToBowl' ? feedApproachSpeed : 1;
+  if (visitingHouse) {
+    if (lawnWalk) target.timeScale = name === 'HouseWalkHome' ? 1.45 : 1.2;
+    else if (name === 'EnterHouse' || name === 'ExitHouse') target.timeScale = 1.7;
+  }
   if (feeding) positionFeeding(name, 0);
-  if (visitingHouse) positionAtHouse(name, 0, target.duration);
+  if (visitingHouse) positionAtHouse(name, 0, Infinity);
   if (sequenceClip) target.currentTime = 0;
   target.play(name === 'Idle' || (sequenceClip && !feeding && !sleeping && !visitingHouse) ? {} : { repetitions: 1, pingpong: false });
   if (name === 'Idle' && motionReduced()) target.pause();
@@ -634,7 +641,8 @@ function startCare() {
   if (roomBlocked()) return stopCare('Room is covered by a dialog or decor editor', true);
   if (care.route && !clearCareRoute(care.route)) return stopCare('Decoration in the walking path', true);
   if (care.action === 'house') {
-    care.houseStart ??= gardenPose(false);
+    care.houseStart ??= care.origin === 'garden' ? gardenPose(false) :
+      { point: gardenArrival, heading: 0 };
     const [x, y] = care.houseStart.point;
     const dx = (houseThreshold[0] - x) * 941;
     const dy = (houseThreshold[1] - y) * 1672;
@@ -645,7 +653,7 @@ function startCare() {
     // Pick the number of complete gait cycles so a longer route gets more
     // steps at the same cadence. Camera depth and scale are in artwork units.
     const cycles = Math.round(distance / (155 * averageScale));
-    care.houseStrideCount = Math.max(4, Math.min(11, cycles));
+    care.houseStrideCount = Math.max(houseStrides, Math.min(11, cycles));
     if (!viewer.availableAnimations.includes('WalkToHouse' + care.houseStrideCount)) {
       care.houseStrideCount = houseStrides;
     }
@@ -655,6 +663,7 @@ function startCare() {
       return stopCare('Decoration in the walking path', true);
     }
   }
+  if (care.action === 'house') positionAtHouse('WalkToHouse', 0, Infinity);
   if (care.action === 'feed') setFoodLevel(1);
   playCareClip();
 }
@@ -698,7 +707,7 @@ function sync() {
     viewer.id = 'jerryBaby3D';
     viewer.setAttribute('aria-hidden', 'true'); // The existing Pet Jerry control handles interaction.
     for (const [name, value] of Object.entries({
-      src: 'assets/models/Jerry_Baby_Animated.glb?v=14',
+      src: 'assets/models/Jerry_Baby_Animated.glb?v=15',
       'animation-crossfade-duration': '250',
       loading: 'eager',
       'interaction-prompt': 'none',

@@ -95,7 +95,7 @@ test('Animated Baby has a weighted skin, blink and chew morphs and all care clip
     'WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome', 'DressTurn',
     'WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome',
     'WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome',
-    ...[4, 5, 6, 8, 9, 10, 11].flatMap(count => ['WalkToHouse' + count, 'HouseWalkHome' + count]),
+    ...[3, 4, 5, 6, 7, 8, 9, 10, 11].flatMap(count => ['WalkToHouse' + count, 'HouseWalkHome' + count]),
   ]);
   assert(gltf.animations[1].channels.some(channel =>
     channel.target.node === gltf.skins[0].skeleton && channel.target.path === 'translation'));
@@ -502,7 +502,7 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
   const scene = doc.getElementById('scene');
   const home = doc.getElementById('home');
   const frames = [];
-  const house = ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome'];
+  const house = ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'HouseWalkHome'];
   const drink = ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome'];
   let hasHome = false;
   window.requestAnimationFrame = callback => frames.push(callback);
@@ -537,8 +537,8 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
 
   hasHome = true;
   scene.getBoundingClientRect = () => ({ left: 0, top: 0, width: 300, height: 533 });
-  let gardenX = 165;
-  viewer.getBoundingClientRect = () => ({ left: gardenX - 45, width: 90, top: 310, height: 100 });
+  const gardenX = 300 * 700 / 941;
+  viewer.getBoundingClientRect = () => ({ left: gardenX - 45, width: 90, top: 191.52, height: 100 });
   for (const [action, room, origin, sequence] of [
     ['house', 'garden', 'garden', house],
     ['house', 'garden', 'garden', house],
@@ -561,8 +561,11 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
         if (clip === 'WalkToHouse' || clip === 'HouseWalkHome') {
           const startX = parseFloat(scene.style.getPropertyValue('--house-x'));
           if (clip === 'WalkToHouse') assert.equal(startX, gardenX / 300 * 100);
-          viewer.currentTime = 2.1;
-          frames.shift()(2100);
+          viewer.currentTime = .15;
+          frames.shift()(150);
+          assert.equal(parseFloat(scene.style.getPropertyValue('--house-x')), startX);
+          viewer.currentTime = .50;
+          frames.shift()(500);
           const currentX = parseFloat(scene.style.getPropertyValue('--house-x'));
           assert(clip === 'WalkToHouse' ? currentX > startX : currentX < startX);
         }
@@ -573,7 +576,7 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
         }
         if (clip === 'RestInside') {
           assert(scene.classList.contains('baby-house-occluded'));
-          assert.equal(parseFloat(scene.style.getPropertyValue('--house-y')), 699 / 1672 * 100);
+          assert.equal(parseFloat(scene.style.getPropertyValue('--house-y')), 594 / 1672 * 100);
         }
       }
       viewer.currentTime = action === 'house' ? viewer.duration : 3.7;
@@ -585,8 +588,17 @@ test('House requires ownership and Drink starts only in the kitchen; both lock c
     assert(!scene.classList.contains('baby-house-route'));
     assert(!scene.classList.contains('baby-house-occluded'));
     assert(!home.disabled && !scene.hasAttribute('data-care-busy'));
-    gardenX += 20;
   }
+  canvas.className = 'room-garden';
+  await settle();
+  act('house');
+  await settle();
+  assert.equal(viewer.animationName, 'WalkToHouse');
+  canvas.className = 'room-bedroom';
+  await settle();
+  assert.equal(viewer.animationName, 'Idle');
+  assert(!scene.classList.contains('baby-house-route'));
+  assert(!scene.hasAttribute('data-care-busy'));
 });
 
 test('House and kitchen Drink controls dispatch care and block repeat water rewards', () => {
@@ -665,7 +677,7 @@ test('Real action buttons complete each care route from every permitted room', a
     ['#sleep', 'bedroom', ['ApproachBed', 'Crouch', 'JumpUp', 'LandOnMattress', 'SettleOnMattress', 'LieDown', 'Sleep', 'WakeUp', 'WalkToBedEdge', 'JumpDown', 'SleepWalkHome']],
     ['#bath', 'bathroom', ['WalkToBath', 'BathSit', 'BathWash', 'BathShake', 'BathWalkHome']],
     ['#ball', 'garden', ['WalkToBall', 'PushBall', 'ChaseBall', 'PlayHappy', 'PlayWalkHome']],
-    ['#home', 'garden', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'Stretch', 'HouseWalkHome']],
+    ['#home', 'garden', ['WalkToHouse', 'EnterHouse', 'RestInside', 'ExitHouse', 'HouseWalkHome']],
     ['[data-kitchen-water]', 'kitchen', ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome']],
     ['#dress', null, ['DressTurn']],
   ];
@@ -720,7 +732,11 @@ test('Real action buttons complete each care route from every permitted room', a
       for (const clip of clips) {
         assert.equal(room(), destination ?? origin);
         assert.equal(played.at(-1), clip);
-        assert.equal(viewer.timeScale, clip === 'WalkToBowl' ? Math.sqrt(1.65) : 1);
+        const expectedSpeed = {
+          WalkToBowl: Math.sqrt(1.65), WalkToHouse: 1.2, HouseWalkHome: 1.45,
+          EnterHouse: 1.7, ExitHouse: 1.7,
+        };
+        assert.equal(viewer.timeScale, expectedSpeed[clip] ?? 1);
         assert($('#scene').hasAttribute('data-care-busy'));
         // Safari suppresses frames while the page is in the background.
         for (const visibility of [true, false]) {

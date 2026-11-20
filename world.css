@@ -343,9 +343,9 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-garden:has(> #scene.jerry-baby-3d-ready){--garden-art:url('./assets/rooms/Garden-Baby.webp')}
 .room-canvas.room-garden{background-image:var(--garden-art);background-size:100% 100%}
 .room-garden :is(#jerryBaby3D,#jerryBabyTest3D){
- left:calc(var(--garden-rest-x, var(--baby-center)) - var(--baby-viewport) / 2);
- top:calc(var(--garden-rest-y, 76.0132%) - 14.7132%);bottom:auto;
- scale:var(--garden-rest-scale, 1.875);
+ left:calc(var(--garden-rest-x, 74.389%) - var(--baby-viewport) / 2);
+ top:calc(var(--garden-rest-y, 51.017%) - 14.7132%);bottom:auto;
+ scale:var(--garden-rest-scale, 1.40625);
 }
 .room-garden #scene.baby-house-route #jerryBaby3D{
  left:calc(var(--house-x) - var(--baby-viewport) / 2);
