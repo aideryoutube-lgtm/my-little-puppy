@@ -384,7 +384,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 .room-kitchen > #scene.jerry-baby-3d-ready.baby-food-bowl-ready #babyFoodRug{display:block}
 
 #jerryActionStatus{font-size:12px;margin:6px 0}
-#jerryLegacyClip{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;z-index:5;pointer-events:none;opacity:0}
-#scene.jerry-video-playing #jerryLegacyClip{opacity:1}
-#scene.jerry-video-playing #roomJerry{visibility:hidden}
+#jerryVideoLayer{position:absolute;inset:0;overflow:hidden;z-index:14;pointer-events:none;opacity:0}
+#jerryVideoLayer.is-playing{opacity:1;pointer-events:auto}
+#jerryLegacyClip{display:block;width:100%;height:100%;object-fit:cover;object-position:center}
 #jerryModeSwitch button{min-height:44px;min-width:44px}

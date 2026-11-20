@@ -2,6 +2,7 @@
 (() => {
   'use strict';
   const scene = document.getElementById('scene');
+  const layer = document.getElementById('jerryVideoLayer');
   const status = document.getElementById('jerryActionStatus');
   const videos = {
     Baby: {feed:'Jerry_Baby_Feed_4s.mp4',sleep:'Jerry_Baby_Sleep_4s.mp4',play:'Jerry_Baby_Play_4s.mp4',bath:'Jerry_Baby_Bath.mp4',house:'Jerry_Baby_House_4s.mp4',touch:'Jerry_Baby_Touch_Happy.mp4',dress:'Jerry_Baby_Dress.mp4'},
@@ -27,7 +28,7 @@
     request.video.load();
     request.download?.abort();
     if (request.objectURL) URL.revokeObjectURL(request.objectURL);
-    scene.classList.remove('jerry-video-playing');
+    layer.classList.remove('is-playing');
     scene.removeAttribute('data-care-busy');
     buttons.forEach(button => { button.disabled = false; });
     if (outcome === 'error') {
@@ -60,7 +61,7 @@
       video.muted = true;
       video.setAttribute('aria-label', 'Jerry: ' + action);
       const reveal = () => {
-        if (active === request) scene.classList.add('jerry-video-playing');
+        if (active === request) layer.classList.add('is-playing');
       };
       video.addEventListener('playing', () => {
         if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(reveal);
@@ -70,7 +71,7 @@
       video.addEventListener('error', () => finish(request, 'error'), {once:true});
       const folder = (silent[stage]?.includes(action) ? 'silent/' : '') + stage.toLowerCase();
       const source = 'assets/videos/' + folder + '/' + file;
-      scene.append(video);
+      layer.append(video);
       request.timer = setTimeout(() => finish(request, 'error'), 15000);
       function start(url) {
         video.src = url;
