@@ -56,9 +56,14 @@ test('legacy bedroom furniture is editable without floating shortcuts or lost ow
   const options=a.$('.room-furniture-options');
   assert.equal(options.hidden,true);
   assert.equal(a.$('#placedFurniture button'),null);
-  assert.equal(a.$('#roomToolbar').contains(a.$('#dailyRewardsLaunch')),true);
-  assert.equal(a.canvas.contains(a.$('.scene-actions')),false);
+  assert.equal(a.$('#dailyRewardsLaunch'),null);
+  assert.equal(a.canvas.contains(a.$('.scene-actions')),true);
   assert.equal(a.canvas.contains(a.$('.status')),false);
+  a.click('#worldSettingsButton');
+  assert.equal(a.$('#worldContent').contains(a.$('#dailyRewardsLaunch')),true);
+  a.click('#dailyRewardsLaunch');
+  assert.equal(a.$('.gift-calendar').children.length,7);
+  assert.equal(a.$('#dailyRewardsLaunch'),null);
   a.click('#worldSettingsButton');a.click('#editDecorButton');
   const rug=a.$('.room-furniture-options input[value=rug]');
   assert.equal(options.hidden,false);
