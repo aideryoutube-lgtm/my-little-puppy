@@ -11,11 +11,55 @@
   };
   // Use silent copies of these clips so playback does not depend on audio decoding.
   const silent = { Baby: ['sleep', 'bath', 'touch'], Puppy: ['feed', 'house', 'sleep', 'bath', 'touch'] };
-  const buttons = document.querySelectorAll('.scene-actions button');
+  const bathroomActions = [
+    ['Bath', '🛁'],
+    ['Bubbles', '🫧', 'Jerry_Puppy_Bathroom_Bubbles.mp4'],
+    ['Brush', '🪮', 'Jerry_Puppy_Bathroom_Brush.mp4'],
+    ['Dry', '💨', 'Jerry_Puppy_Bathroom_Dry.mp4'],
+    ['Mirror', '🪞', 'Jerry_Puppy_Bathroom_Mirror.mp4']
+  ];
+  const standardActions = document.querySelector('.scene-actions');
+  const buttons = standardActions.querySelectorAll('button');
+  const bathroomPanel = document.createElement('nav');
+  bathroomPanel.id = 'bathroom2dActions';
+  bathroomPanel.className = 'scene-actions';
+  bathroomPanel.setAttribute('aria-label', 'Bathroom actions');
+  bathroomPanel.hidden = true;
+  const bathroomFiles = new Map();
+  for (const [label, icon, file] of bathroomActions) {
+    const action = label.toLowerCase();
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('aria-label', label);
+    const symbol = document.createElement('span');
+    symbol.className = 'action-icon';
+    symbol.setAttribute('aria-hidden', 'true');
+    symbol.textContent = icon;
+    button.append(symbol);
+    bathroomPanel.append(button);
+    if (file) bathroomFiles.set(action, file);
+    button.addEventListener('click', () => {
+      if (bathroomPanel.hidden || button.disabled) return;
+      if (file) window.pawtopiaJerryVideo.play(action);
+      else document.getElementById('bath').click();
+    });
+  }
+  standardActions.after(bathroomPanel);
   let active;
 
   function context() {
     return [scene.dataset.growthStage, window.pawtopiaWorld.snapshot().world.room];
+  }
+
+  function renderBathroomActions() {
+    const visible = window.pawtopiaJerryMode === '2d'
+      && window.pawtopiaWorld.snapshot().world.room === 'bathroom';
+    standardActions.hidden = visible;
+    bathroomPanel.hidden = !visible;
+    const puppy = scene.dataset.growthStage === 'Puppy';
+    for (const [index, button] of Array.from(bathroomPanel.children).entries()) {
+      button.disabled = Boolean(active) || (Boolean(bathroomActions[index][2]) && !puppy);
+    }
   }
 
   function finish(request, outcome) {
@@ -31,6 +75,7 @@
     layer.classList.remove('is-playing');
     scene.removeAttribute('data-care-busy');
     buttons.forEach(button => { button.disabled = false; });
+    renderBathroomActions();
     if (outcome === 'error') {
       status.textContent = 'Jerry’s ' + request.stage + ' ' + request.action + ' video could not play.';
       status.hidden = false;
@@ -44,7 +89,9 @@
       if (action === 'dress-show') return false;
       if (action === 'care') action = 'bath';
       const [stage, room] = context();
-      const file = videos[stage]?.[action];
+      const bathroomFile = window.pawtopiaJerryMode === '2d' && room === 'bathroom' && stage === 'Puppy'
+        ? bathroomFiles.get(action) : undefined;
+      const file = bathroomFile || videos[stage]?.[action];
       status.hidden = true;
       if (!file) {
         status.textContent = 'No ' + action + ' video is available for Jerry’s ' + stage + ' stage.';
@@ -56,6 +103,7 @@
       active = request;
       scene.setAttribute('data-care-busy', '');
       buttons.forEach(button => { button.disabled = true; });
+      renderBathroomActions();
       video.id = 'jerryLegacyClip';
       video.playsInline = true;
       video.muted = true;
@@ -77,9 +125,8 @@
         video.src = url;
         video.play()?.catch(() => finish(request, 'error'));
       }
-      if (stage === 'Baby' && action === 'dress') {
-        // WebKit can stall on the original clip's HTTP stream even when
-        // buffered. Play the same bytes from memory instead.
+      if (bathroomFile || (stage === 'Baby' && action === 'dress')) {
+        // WebKit can stall on these HTTP streams. Play their original bytes from memory.
         request.download = new AbortController();
         fetch(source, { signal: request.download.signal }).then(response => {
           if (!response.ok) throw new Error('Video download failed');
@@ -95,12 +142,19 @@
   };
 
   function cancel() { finish(active, 'cancelled'); }
-  document.addEventListener('pawtopia-jerry-mode-change', cancel);
+  document.addEventListener('pawtopia-jerry-mode-change', () => {
+    cancel();
+    renderBathroomActions();
+  });
   document.addEventListener('pawtopia-restored', cancel);
   window.addEventListener('pagehide', cancel);
   document.addEventListener('pawtopia-state', () => {
-    if (!active) return;
-    const [stage, room] = context();
-    if (stage !== active.stage || room !== active.room) cancel();
+    if (active) {
+      const [stage, room] = context();
+      if (stage !== active.stage || room !== active.room) cancel();
+    }
+    renderBathroomActions();
   });
+  // The mode switch is initialized by the following inline script.
+  document.addEventListener('DOMContentLoaded', renderBathroomActions, {once:true});
 })();

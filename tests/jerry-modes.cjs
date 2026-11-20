@@ -124,3 +124,84 @@ test('3D Dress opens the wardrobe, applies clothing and closes when leaving 3D',
   assert.equal($('#worldOverlay').hidden, true);
   assert.equal($('#jerryLegacyClip'), null);
 });
+
+test('only 2D Bathroom shows the five icon controls and routes Puppy clips', async t => {
+  const { w, $, click, events } = setup(t, 100);
+  const panel = $('#bathroom2dActions');
+  const original = $('.scene-actions');
+  const originalMarkup = original.innerHTML;
+  let downloaded;
+  w.fetch = async path => {
+    downloaded = path;
+    return {ok: true, blob: async () => new w.Blob()};
+  };
+  w.URL.createObjectURL = () => 'blob:bathroom';
+  w.URL.revokeObjectURL = () => {};
+  assert(panel.hidden);
+  assert(!original.hidden);
+
+  click('[data-room="bathroom"]');
+  assert(!panel.hidden);
+  assert(original.hidden);
+  const buttons = [...panel.querySelectorAll('button')];
+  assert.deepEqual(buttons.map(button => button.getAttribute('aria-label')),
+    ['Bath', 'Bubbles', 'Brush', 'Dry', 'Mirror']);
+  assert.deepEqual(buttons.map(button => button.textContent), ['🛁', '🫧', '🪮', '💨', '🪞']);
+  assert(buttons.every(button => button.firstElementChild.getAttribute('aria-hidden') === 'true'));
+
+  for (const button of buttons) {
+    const label = button.getAttribute('aria-label');
+    button.click();
+    const video = $('#jerryLegacyClip');
+    const expected = label === 'Bath'
+      ? 'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4'
+      : 'assets/videos/puppy/Jerry_Puppy_Bathroom_' + label + '.mp4';
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(label === 'Bath' ? video.getAttribute('src') : downloaded, expected);
+    if (label !== 'Bath') assert.equal(video.getAttribute('src'), 'blob:bathroom');
+    assert(fs.existsSync(expected));
+    assert(buttons.every(button => button.disabled));
+    buttons[4].click();
+    assert.equal($('#jerryLegacyClip'), video);
+    video.dispatchEvent(new w.Event('ended'));
+    assert.equal($('#jerryLegacyClip'), null);
+    assert.equal(w.pawtopiaWorld.snapshot().world.room, 'bathroom');
+    assert(buttons.every(button => !button.disabled));
+  }
+
+  buttons[1].click();
+  click('[data-jerry-mode="3d"]');
+  assert.equal($('#jerryLegacyClip'), null);
+  assert(panel.hidden);
+  assert(!original.hidden);
+  buttons[1].click();
+  assert.equal($('#jerryLegacyClip'), null);
+  assert.deepEqual(events, []);
+
+  click('[data-jerry-mode="2d"]');
+  buttons[2].click();
+  click('[data-room="living"]');
+  assert.equal($('#jerryLegacyClip'), null);
+  assert(panel.hidden);
+  assert(!original.hidden);
+  assert.equal(original.innerHTML, originalMarkup);
+  click('#bath');
+  assert.equal($('#jerryLegacyClip').getAttribute('src'), 'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4');
+});
+
+for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
+  test(stage + ' Bathroom keeps Bath and disables the four Puppy actions', t => {
+    const { $, click } = setup(t, xp);
+    click('[data-room="bathroom"]');
+    const [bath, ...puppyActions] = $('#bathroom2dActions').children;
+    assert(!bath.disabled);
+    for (const button of puppyActions) {
+      assert(button.disabled);
+      button.click();
+      assert.equal($('#jerryLegacyClip'), null);
+    }
+    bath.click();
+    assert.match($('#jerryLegacyClip').getAttribute('src'),
+      new RegExp('/' + stage.toLowerCase() + '/Jerry_' + stage + '_Bath\\.mp4$'));
+  });
+}
