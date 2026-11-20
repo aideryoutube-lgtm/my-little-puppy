@@ -369,7 +369,14 @@ def eat(t):
     data[tongue, 'scale'] = [lick] * 3
     data[tongue, 'translation'] = [0, -.025 + .045 * lick, .49 + .062 * lick]
     data[0, 'weights'] = (.65 * lick, chewing)
-    data[tail, 'rotation'] = quaternion(1, .58 * wag * math.sin(math.tau * 4.5 * t))
+    # Relax the curled tail behind the rump as Jerry lowers his head.
+    tail_relax = smooth(t / .62) * (1 - smooth((t - 4.0) / .48))
+    pitch = -.55 * tail_relax / 2
+    yaw = .58 * wag * math.sin(math.tau * 4.5 * t) / 2
+    data[tail, 'rotation'] = [
+        math.sin(pitch) * math.cos(yaw), math.cos(pitch) * math.sin(yaw),
+        math.sin(pitch) * math.sin(yaw), math.cos(pitch) * math.cos(yaw)
+    ]
     return data
 
 

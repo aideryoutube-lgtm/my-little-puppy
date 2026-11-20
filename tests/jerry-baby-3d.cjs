@@ -166,6 +166,12 @@ test('Care clips share the skeleton and preserve the root and prop positions at 
     const keys = samples('Eat', named[name], 'rotation');
     assert(keys.some(key => key.some((component, axis) => component !== keys[0][axis])));
   }
+  const tailDuringMeal = samples('Eat', named.Tail, 'rotation');
+  const approachTail = samples('WalkToBowl', named.Tail, 'rotation').at(-1);
+  assert(tailDuringMeal[0].every((value, axis) => value === approachTail[axis]));
+  assert(tailDuringMeal.some(([pitch]) => pitch < -.25));
+  const returnTail = samples('WalkHome', named.Tail, 'rotation')[0];
+  assert(tailDuringMeal.at(-1).every((value, axis) => value === returnTail[axis]));
   assert(samples('Eat', 0, 'weights').some(([, chew]) => chew > .75));
   assert(samples('Idle', 0, 'weights').every(([, chew]) => chew === 0));
   assert(samples('Eat', named.Tongue, 'scale').some(key => key[0] > 0));
@@ -708,6 +714,7 @@ test('Real action buttons complete each care route from every permitted room', a
       for (const clip of clips) {
         assert.equal(room(), destination ?? origin);
         assert.equal(played.at(-1), clip);
+        assert.equal(viewer.timeScale, clip === 'WalkToBowl' ? Math.sqrt(2.8) : 1);
         assert($('#scene').hasAttribute('data-care-busy'));
         // Safari suppresses frames while the page is in the background.
         for (const visibility of [true, false]) {
@@ -757,6 +764,7 @@ test('Real action buttons complete each care route from every permitted room', a
         await settle();
       }
       assert.deepEqual(played, [...clips, 'Idle']);
+      assert.equal(viewer.timeScale, 1);
       assert.equal(room(), isFeed || isSleep ? destination : origin);
       if (isFeed) {
         assert.equal(bowlLevel(), 0);
