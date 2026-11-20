@@ -1,6 +1,6 @@
-// Run against a local server or the private Preview using Playwright Chromium.
+// Run against a local server or the private Preview using Playwright Chromium or WebKit.
 const assert = require('node:assert/strict');
-const { chromium } = require('playwright');
+const { chromium, webkit } = require('playwright');
 const { mkdirSync } = require('node:fs');
 const { join } = require('node:path');
 
@@ -30,7 +30,7 @@ async function verifyFeeding(page) {
   const screenshots = process.env.PAWTOPIA_SCREENSHOTS;
   if (screenshots) mkdirSync(screenshots, { recursive: true });
   const capture = name => screenshots && room.screenshot({ path: join(screenshots, name + '.png') });
-  await page.locator('[data-room="kitchen"]').tap();
+  await page.locator('#roomNav button[data-room="kitchen"]').tap();
   await idle();
   const start = await viewer.boundingBox();
   const initial = await save();
@@ -62,7 +62,7 @@ async function verifyFeeding(page) {
   const beforeCancel = await save();
   await page.locator('#food').tap();
   await waitForClip('WalkToBowl', 0.25);
-  await page.locator('[data-room="living"]').tap();
+  await page.locator('#roomNav button[data-room="living"]').tap();
   await idle();
   assert.equal(await bowl.getAttribute('data-food-level'), '0');
   assert.equal((await save()).feedCount, beforeCancel.feedCount);
@@ -72,7 +72,9 @@ async function verifyFeeding(page) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
+  const browser = process.env.WEBKIT_PATH
+    ? await webkit.launch({ executablePath: process.env.WEBKIT_PATH })
+    : await chromium.launch({ executablePath: process.env.CHROMIUM_PATH });
   try {
     const httpCredentials = process.env.PREVIEW_USER && process.env.PREVIEW_PASSWORD
       ? { username: process.env.PREVIEW_USER, password: process.env.PREVIEW_PASSWORD }
@@ -91,21 +93,23 @@ async function main() {
     await verifyFeeding(page);
     for (const [button, clips] of actions) {
       const origin = button === '[data-kitchen-water]' ? 'kitchen' : 'living';
-      await page.locator(`[data-room="${origin}"]`).tap();
+      await page.locator(`#roomNav button[data-room="${origin}"]`).tap();
       if (button.startsWith('[data-dress-item')) await page.locator('#dress').tap();
       await page.locator(button).tap();
       for (const name of clips) {
         // Observe elapsed mixer time in the real renderer for each distinct clip.
         await page.waitForFunction(clip => {
           const model = document.getElementById('jerryBaby3D');
-          return model.animationName === clip && !model.paused && model.currentTime > 0.15;
+          const houseWalk = clip === 'WalkToHouse' || clip === 'HouseWalkHome';
+          const matches = model.animationName === clip || (houseWalk && new RegExp('^' + clip + '[0-9]+$').test(model.animationName));
+          return matches && !model.paused && model.currentTime > 0.15;
         }, name, { timeout: 8000 });
       }
       await page.waitForFunction(() => {
         const model = document.getElementById('jerryBaby3D');
         return model.animationName === 'Idle' && !document.getElementById('scene').hasAttribute('data-care-busy');
       }, null, { timeout: 8000 });
-      assert.equal(await page.locator(`[data-room="${button === '#food' ? 'kitchen' : button === '#sleep' ? 'bedroom' : origin}"]`).getAttribute('aria-pressed'), 'true');
+      assert.equal(await page.locator(`#roomNav button[data-room="${button === '#food' ? 'kitchen' : button === '#sleep' ? 'bedroom' : origin}"]`).getAttribute('aria-pressed'), 'true');
       console.log(button, 'advanced through all clips and returned to Idle');
     }
     const before = await page.evaluate(() => window.pawtopiaWorld.snapshot());

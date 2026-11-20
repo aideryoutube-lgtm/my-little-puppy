@@ -349,7 +349,7 @@ const clothing = {
   'Yellow Raincoat': { slot: 'outfit', id: 'baby-yellow-coat' },
   'Red Cap': { slot: 'hat', id: 'baby-red-cap' }
 };
-const careButtons = ['food', 'sleep', 'bath', 'ball', 'dress', 'home'];
+const careButtons = ['food', 'sleep', 'bath', 'ball', 'dress', 'home', 'touchJerry'];
 
 function lockCare(locked) {
   scene.toggleAttribute('data-care-busy', locked);
@@ -662,7 +662,9 @@ function advanceCare() {
   if (care.index < care.clips.length) return playCareClip();
   const meal = care.action === 'feed' ? care : undefined;
   const sleep = care.action === 'sleep' ? care : undefined;
+  const finishAction = care.finishAction;
   stopCare('completed', !meal && !sleep);
+  finishAction?.();
   meal?.finishMeal?.();
   sleep?.finishSleep?.();
 }
@@ -769,13 +771,13 @@ function sync() {
 }
 
 scene.addEventListener('pawtopia-jerry-action', event => {
-  const { action, finishMeal, finishSleep } = event.detail;
+  const { action, finishMeal, finishSleep, finishAction } = event.detail;
   const origin = roomName();
-  if (scene.dataset.growthStage !== 'Baby' || !origin) return;
+  if (window.pawtopiaJerryMode === '2d' || scene.dataset.growthStage !== 'Baby' || !origin) return;
   const config = Object.hasOwn(careActions, action) ? careActions[action] :
     action === 'dress-show' ? { room: origin, clips: ['DressTurn'] } : undefined;
   if (!config && action !== 'touch') return;
-  if ((finishMeal || finishSleep) && care) event.preventDefault();
+  if ((finishMeal || finishSleep || finishAction) && care) event.preventDefault();
   if (failed || care || viewer?.hidden || motionReduced() || (action === 'feed' && foodFailed)) {
     careDebug('Ignored ' + action + ': ' + (care ? 'busy' : 'viewer or motion setting'));
     return;
@@ -798,9 +800,9 @@ scene.addEventListener('pawtopia-jerry-action', event => {
     careDebug('Ignored ' + action + ': room blocked');
     return;
   }
-  if (finishMeal || finishSleep) event.preventDefault();
+  if (finishMeal || finishSleep || finishAction) event.preventDefault();
   clearTimeout(walkTimer);
-  care = { ...config, action, origin, finishMeal, finishSleep, index: 0, state: 'WaitingForRoom' };
+  care = { ...config, action, origin, finishMeal, finishSleep, finishAction, index: 0, state: 'WaitingForRoom' };
   syncTestBaby();
   if (action === 'house' && origin === 'garden' && ready) {
     care.houseStart = gardenPose(true);
@@ -837,6 +839,10 @@ new MutationObserver(syncMotion).observe(document.documentElement, {
   attributes: true, attributeFilter: ['data-effects']
 });
 
+window.addEventListener('pagehide', () => {
+  if (care) stopCare('Page closed');
+  clearTimeout(walkTimer);
+});
 document.addEventListener('pawtopia-jerry-mode-change', () => { if (care) stopCare('Display mode changed', true); sync(); });
 const observer = new MutationObserver(sync);
 observer.observe(scene, { attributes: true, attributeFilter: ['class', 'data-growth-stage'] });
