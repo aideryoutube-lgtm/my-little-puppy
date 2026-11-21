@@ -25,7 +25,10 @@
   bathroomPanel.className = 'scene-actions';
   bathroomPanel.setAttribute('aria-label', 'Bathroom actions');
   bathroomPanel.hidden = true;
-  const bathroomFiles = new Map();
+  const puppyRoomFiles = {
+    bathroom: { bath: 'Puppy_Bath_Bathroom_4s.mp4' },
+    bedroom: { sleep: 'Puppy_Sleep_Bedroom_4s.mp4', play: 'Puppy_Play_Bedroom_4s.mp4' }
+  };
   for (const [label, icon, file] of bathroomActions) {
     const action = label.toLowerCase();
     const button = document.createElement('button');
@@ -37,7 +40,7 @@
     symbol.textContent = icon;
     button.append(symbol);
     bathroomPanel.append(button);
-    if (file) bathroomFiles.set(action, file);
+    if (file) puppyRoomFiles.bathroom[action] = file;
     button.addEventListener('click', () => {
       if (bathroomPanel.hidden || button.disabled) return;
       if (file) window.pawtopiaJerryVideo.play(action);
@@ -89,9 +92,9 @@
       if (action === 'dress-show') return false;
       if (action === 'care') action = 'bath';
       const [stage, room] = context();
-      const bathroomFile = window.pawtopiaJerryMode === '2d' && room === 'bathroom' && stage === 'Puppy'
-        ? bathroomFiles.get(action) : undefined;
-      const file = bathroomFile || videos[stage]?.[action];
+      const puppyRoomFile = window.pawtopiaJerryMode === '2d' && stage === 'Puppy'
+        ? puppyRoomFiles[room]?.[action] : undefined;
+      const file = puppyRoomFile || videos[stage]?.[action];
       status.hidden = true;
       if (!file) {
         status.textContent = 'No ' + action + ' video is available for Jerry’s ' + stage + ' stage.';
@@ -117,7 +120,7 @@
       }, {once:true});
       video.addEventListener('ended', () => finish(request, 'completed'), {once:true});
       video.addEventListener('error', () => finish(request, 'error'), {once:true});
-      const folder = (silent[stage]?.includes(action) ? 'silent/' : '') + stage.toLowerCase();
+      const folder = (!puppyRoomFile && silent[stage]?.includes(action) ? 'silent/' : '') + stage.toLowerCase();
       const source = 'assets/videos/' + folder + '/' + file;
       layer.append(video);
       request.timer = setTimeout(() => finish(request, 'error'), 15000);
@@ -125,7 +128,7 @@
         video.src = url;
         video.play()?.catch(() => finish(request, 'error'));
       }
-      if (bathroomFile || (stage === 'Baby' && action === 'dress')) {
+      if (puppyRoomFile || (stage === 'Baby' && action === 'dress')) {
         // WebKit can stall on these HTTP streams. Play their original bytes from memory.
         request.download = new AbortController();
         fetch(source, { signal: request.download.signal }).then(response => {

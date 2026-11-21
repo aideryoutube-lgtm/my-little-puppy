@@ -154,11 +154,11 @@ test('only 2D Bathroom shows the five icon controls and routes Puppy clips', asy
     button.click();
     const video = $('#jerryLegacyClip');
     const expected = label === 'Bath'
-      ? 'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4'
+      ? 'assets/videos/puppy/Puppy_Bath_Bathroom_4s.mp4'
       : 'assets/videos/puppy/Jerry_Puppy_Bathroom_' + label + '.mp4';
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(label === 'Bath' ? video.getAttribute('src') : downloaded, expected);
-    if (label !== 'Bath') assert.equal(video.getAttribute('src'), 'blob:bathroom');
+    assert.equal(downloaded, expected);
+    assert.equal(video.getAttribute('src'), 'blob:bathroom');
     assert(fs.existsSync(expected));
     assert(buttons.every(button => button.disabled));
     buttons[4].click();
@@ -257,3 +257,38 @@ test('3D models follow the current stage and ignore a previous model’s load ev
   assert.equal($('#jerry3D'), null);
   assert.equal(ready(), false);
 });
+
+for (const [button, action] of [['#sleep', 'Sleep'], ['#ball', 'Play']]) {
+  test('Puppy Bedroom ' + action + ' plays once and returns to Bedroom', async t => {
+    const { w, $, click, events } = setup(t, 100);
+    const downloads = [];
+    w.fetch = async path => {
+      downloads.push(path);
+      return { ok: true, blob: async () => new w.Blob() };
+    };
+    w.URL.createObjectURL = () => 'blob:bedroom';
+    w.URL.revokeObjectURL = () => {};
+    click('[data-room="bedroom"]');
+    click(button);
+    const video = $('#jerryLegacyClip');
+    $(button).click();
+    await new Promise(resolve => setImmediate(resolve));
+    const expected = 'assets/videos/puppy/Puppy_' + action + '_Bedroom_4s.mp4';
+    assert.deepEqual(downloads, [expected]);
+    assert(fs.existsSync(expected));
+    assert.equal(video.getAttribute('src'), 'blob:bedroom');
+    assert.equal(video.playsInline, true);
+    assert.equal(video.muted, true);
+    video.dispatchEvent(new w.Event('playing'));
+    assert($('#jerryVideoLayer').classList.contains('is-playing'));
+    video.dispatchEvent(new w.Event('ended'));
+    assert.equal($('#jerryLegacyClip'), null);
+    assert(!$('#jerryVideoLayer').classList.contains('is-playing'));
+    assert.equal(w.pawtopiaWorld.snapshot().world.room, 'bedroom');
+    assert.deepEqual(events, []);
+    click('[data-jerry-mode="3d"]');
+    click(button);
+    assert.equal($('#jerryLegacyClip'), null);
+    assert.deepEqual(events, [action.toLowerCase()]);
+  });
+}
