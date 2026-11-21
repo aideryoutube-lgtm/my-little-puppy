@@ -205,3 +205,55 @@ for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
       new RegExp('/' + stage.toLowerCase() + '/Jerry_' + stage + '_Bath\\.mp4$'));
   });
 }
+
+test('3D models follow the current stage and ignore a previous model’s load event', async t => {
+  const { w, $, click } = setup(t, 299, '3d');
+  const scene = $('#scene');
+  scene.dataset.growthStage = 'Baby';
+  w.eval(fs.readFileSync('jerry-3d.js', 'utf8'));
+  w.document.dispatchEvent(new w.Event('DOMContentLoaded'));
+  const setStage = async stage => {
+    scene.dataset.growthStage = stage;
+    await new Promise(resolve => setImmediate(resolve));
+  };
+  const ready = () => scene.classList.contains('jerry-3d-ready');
+
+  assert.equal($('#jerry3D'), null);
+  await setStage('Puppy');
+  const puppy = $('#jerry3D');
+  assert.match(puppy.getAttribute('src'), /^assets\/models\/Jerry_Puppy\.glb\?/);
+  assert.equal(ready(), false);
+
+  w.pawtopiaWorld.action('feed');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(scene.dataset.growthStage, 'Adult');
+  const adult = $('#jerry3D');
+  assert.equal(puppy.isConnected, false);
+  assert.equal(adult.getAttribute('src'), 'assets/models/Jerry_Adult.glb');
+  puppy.dispatchEvent(new w.Event('load'));
+  assert.equal(ready(), false);
+
+  adult.dispatchEvent(new w.Event('load'));
+  assert.equal(ready(), true);
+  adult.click();
+  assert.equal($('#jerryActionStatus').textContent, 'No Adult 3D animation is available for touch.');
+  for (const room of ['living', 'kitchen', 'bedroom', 'bathroom', 'garden']) {
+    w.pawtopiaWorld.commit('room', room);
+    assert.equal($('#jerry3D'), adult);
+    assert.equal(ready(), true);
+  }
+
+  click('[data-jerry-mode="2d"]');
+  assert.equal(adult.hidden, true);
+  assert.equal(ready(), false);
+  click('[data-jerry-mode="3d"]');
+  assert.equal(adult.hidden, false);
+  assert.equal(ready(), true);
+
+  adult.dispatchEvent(new w.Event('error'));
+  assert.equal(ready(), false);
+  assert.equal($('#jerryActionStatus').textContent, 'The Adult 3D model could not load.');
+  await setStage('Baby');
+  assert.equal($('#jerry3D'), null);
+  assert.equal(ready(), false);
+});

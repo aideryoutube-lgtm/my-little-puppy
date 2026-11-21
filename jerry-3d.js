@@ -1,30 +1,59 @@
-/* The Puppy GLB is static until stage-specific animation clips are available. */
+/* Puppy and Adult use static models until their own animation clips are available. */
 (() => {
   'use strict';
   const scene = document.getElementById('scene');
   const status = document.getElementById('jerryActionStatus');
+  const models = {
+    Puppy: { src: 'assets/models/Jerry_Puppy.glb?v=2', orbit: '0deg 75deg 105%' },
+    Adult: { src: 'assets/models/Jerry_Adult.glb', orbit: '0deg 75deg 105%' }
+  };
   let viewer;
+  let viewerStage;
   let loaded = false;
   let failed = false;
 
   function sync() {
-    const show = window.pawtopiaJerryMode !== '2d' && scene.dataset.growthStage === 'Puppy';
+    const stage = scene.dataset.growthStage;
+    const model = models[stage];
+    const show = window.pawtopiaJerryMode !== '2d' && Boolean(model);
+    if (viewer && viewerStage !== stage) {
+      viewer.remove();
+      viewer = undefined;
+      loaded = false;
+      failed = false;
+    }
     if (show && !viewer) {
-      viewer = document.createElement('model-viewer');
+      const current = document.createElement('model-viewer');
+      viewer = current;
+      viewerStage = stage;
       viewer.id = 'jerry3D';
-      viewer.alt = 'Jerry Puppy';
-      viewer.setAttribute('camera-orbit', '0deg 75deg 105%');
+      viewer.alt = 'Jerry ' + stage;
+      viewer.setAttribute('camera-orbit', model.orbit);
       viewer.setAttribute('interaction-prompt', 'none');
       viewer.setAttribute('loading', 'eager');
-      viewer.addEventListener('load', () => { loaded = true; failed = false; sync(); });
-      viewer.addEventListener('error', () => { loaded = false; failed = true; sync(); });
-      viewer.setAttribute('src', 'assets/models/Jerry_Puppy.glb');
+      viewer.setAttribute('disable-tap', '');
+      viewer.addEventListener('click', () => {
+        if (current === viewer && !current.hidden && loaded) window.pawtopiaWorld.action('touch');
+      });
+      viewer.addEventListener('load', () => {
+        if (current !== viewer) return;
+        loaded = true;
+        failed = false;
+        sync();
+      });
+      viewer.addEventListener('error', () => {
+        if (current !== viewer) return;
+        loaded = false;
+        failed = true;
+        sync();
+      });
+      viewer.setAttribute('src', model.src);
       scene.prepend(viewer);
     }
     if (viewer) viewer.hidden = !show;
     scene.classList.toggle('jerry-3d-ready', show && loaded);
     if (show && failed) {
-      status.textContent = 'The Puppy 3D model could not load.';
+      status.textContent = 'The ' + stage + ' 3D model could not load.';
       status.hidden = false;
     }
   }
@@ -34,8 +63,8 @@
     const stage = scene.dataset.growthStage;
     if (stage === 'Baby') return;
     const action = event.detail.action === 'care' ? 'bath' : event.detail.action;
-    status.textContent = stage === 'Puppy' && !failed
-      ? 'No Puppy 3D animation is available for ' + action + '.'
+    status.textContent = models[stage] && !failed
+      ? 'No ' + stage + ' 3D animation is available for ' + action + '.'
       : 'The ' + stage + ' 3D model is unavailable.';
     status.hidden = false;
   });
@@ -45,7 +74,10 @@
       sync();
     }
   }).observe(scene, {attributes:true, attributeOldValue:true, attributeFilter:['data-growth-stage']});
-  document.addEventListener('pawtopia-jerry-mode-change', sync);
+  document.addEventListener('pawtopia-jerry-mode-change', () => {
+    status.hidden = true;
+    sync();
+  });
   // The inline mode selector runs later in the same document.
   document.addEventListener('DOMContentLoaded', sync, {once:true});
 })();
