@@ -53,7 +53,7 @@
     bedroom: [
       { control: 'sleep' },
       { control: 'ball' },
-      { id: 'puppy-bedroom-dress', label: 'Dress', icon: '👕', file: null },
+      { id: 'puppy-bedroom-dress', label: 'Dress', icon: '👕', file: 'Puppy_Dress_Bedroom_4s_DeepCrop.mp4' },
       { id: 'puppy-bedroom-jump', label: 'Jump', icon: '⬆️', file: 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4' },
       { id: 'puppy-bedroom-cuddle', label: 'Cuddle', icon: '🤗', file: 'Puppy_Cuddle_Bedroom_4s.mp4' }
     ],

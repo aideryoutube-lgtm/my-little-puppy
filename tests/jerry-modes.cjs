@@ -301,6 +301,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
   const original = $('.scene-actions');
   const markup = original.innerHTML;
   const clips = {
+    'puppy-bedroom-dress': 'Puppy_Dress_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-jump': 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-cuddle': 'Puppy_Cuddle_Bedroom_4s.mp4',
     'puppy-kitchen-feed': 'Puppy_Feed_Kitchen_4s_Cropped.mp4'
