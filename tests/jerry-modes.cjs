@@ -300,6 +300,11 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
   const { w, $, click, save } = setup(t, 100);
   const original = $('.scene-actions');
   const markup = original.innerHTML;
+  const clips = {
+    'puppy-bedroom-jump': 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4',
+    'puppy-bedroom-cuddle': 'Puppy_Cuddle_Bedroom_4s.mp4',
+    'puppy-kitchen-feed': 'Puppy_Feed_Kitchen_4s_Cropped.mp4'
+  };
   const slots = new Set();
   w.fetch = () => assert.fail('An unfilled video slot must not request a clip');
   const rooms = {
@@ -320,9 +325,28 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
       assert.equal(button.id, 'puppy-' + room + '-' + button.getAttribute('aria-label').toLowerCase());
       slots.add(button.id);
       button.click();
+      if (clips[button.id]) {
+        const video = $('#jerryLegacyClip');
+        const source = 'assets/videos/puppy/' + clips[button.id];
+        assert(fs.existsSync(source));
+        assert.equal(video.getAttribute('src'), source);
+        assert.equal(video.playsInline, true);
+        assert.equal(video.muted, false);
+        assert(button.disabled);
+        button.click();
+        assert.equal($('#jerryLegacyClip'), video);
+        video.dispatchEvent(new w.Event('playing'));
+        assert($('#jerryVideoLayer').classList.contains('is-playing'));
+        video.dispatchEvent(new w.Event('ended'));
+        assert(!$('#jerryVideoLayer').classList.contains('is-playing'));
+        assert(!button.disabled);
+        assert.equal(w.pawtopiaWorld.snapshot().world.room, room);
+        assert.equal($('#scene').dataset.growthStage, 'Puppy');
+      } else {
+        assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
+        assert(!$('#jerryActionStatus').hidden);
+      }
       assert.equal($('#jerryLegacyClip'), null);
-      assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
-      assert(!$('#jerryActionStatus').hidden);
       assert.deepEqual(save(), before);
     }
     click('[data-jerry-mode="3d"]');

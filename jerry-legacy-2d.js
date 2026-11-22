@@ -54,11 +54,11 @@
       { control: 'sleep' },
       { control: 'ball' },
       { id: 'puppy-bedroom-dress', label: 'Dress', icon: '👕', file: null },
-      { id: 'puppy-bedroom-jump', label: 'Jump', icon: '⬆️', file: null },
-      { id: 'puppy-bedroom-cuddle', label: 'Cuddle', icon: '🤗', file: null }
+      { id: 'puppy-bedroom-jump', label: 'Jump', icon: '⬆️', file: 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4' },
+      { id: 'puppy-bedroom-cuddle', label: 'Cuddle', icon: '🤗', file: 'Puppy_Cuddle_Bedroom_4s.mp4' }
     ],
     kitchen: [
-      { id: 'puppy-kitchen-feed', label: 'Feed', icon: '🍖', file: null },
+      { id: 'puppy-kitchen-feed', label: 'Feed', icon: '🍖', file: 'Puppy_Feed_Kitchen_4s_Cropped.mp4' },
       { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: null },
       { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: null },
       { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: null },
@@ -178,7 +178,8 @@
       renderActions();
       video.id = 'jerryLegacyClip';
       video.playsInline = true;
-      video.muted = true;
+      video.muted = !slot;
+      if (slot) video.classList.add('puppy-room-action-clip');
       video.setAttribute('aria-label', 'Jerry: ' + action);
       const reveal = () => {
         if (active === request) layer.classList.add('is-playing');
@@ -197,7 +198,7 @@
         video.src = url;
         video.play()?.catch(() => finish(request, 'error'));
       }
-      if (puppyRoomFile || (stage === 'Baby' && action === 'dress')) {
+      if ((puppyRoomFile && !slot) || (stage === 'Baby' && action === 'dress')) {
         // WebKit can stall on these HTTP streams. Play their original bytes from memory.
         request.download = new AbortController();
         fetch(source, { signal: request.download.signal }).then(response => {
