@@ -269,9 +269,12 @@ for (const [button, action] of [['#sleep', 'Sleep'], ['#ball', 'Play']]) {
     w.URL.createObjectURL = () => 'blob:bedroom';
     w.URL.revokeObjectURL = () => {};
     click('[data-room="bedroom"]');
-    click(button);
+    const visible = $('[data-puppy2d-room="bedroom"] [aria-label="' + action + '"]');
+    assert(!visible.parentElement.hidden);
+    visible.click();
     const video = $('#jerryLegacyClip');
-    $(button).click();
+    assert(visible.disabled);
+    visible.click();
     await new Promise(resolve => setImmediate(resolve));
     const expected = 'assets/videos/puppy/Puppy_' + action + '_Bedroom_4s.mp4';
     assert.deepEqual(downloads, [expected]);
@@ -290,5 +293,59 @@ for (const [button, action] of [['#sleep', 'Sleep'], ['#ball', 'Play']]) {
     click(button);
     assert.equal($('#jerryLegacyClip'), null);
     assert.deepEqual(events, [action.toLowerCase()]);
+  });
+}
+
+test('Puppy 2D room controls use distinct video slots and preserve the shared controls', t => {
+  const { w, $, click, save } = setup(t, 100);
+  const original = $('.scene-actions');
+  const markup = original.innerHTML;
+  const slots = new Set();
+  w.fetch = () => assert.fail('An unfilled video slot must not request a clip');
+  const rooms = {
+    bedroom: ['Sleep', 'Play', 'Dress', 'Jump', 'Cuddle'],
+    kitchen: ['Feed', 'Drink', 'Treat', 'Cook', 'Snack'],
+    garden: ['House', 'Run', 'Fetch', 'Dig', 'Explore']
+  };
+  for (const [room, labels] of Object.entries(rooms)) {
+    click('[data-room="' + room + '"]');
+    const panel = $('[data-puppy2d-room="' + room + '"]');
+    const buttons = [...panel.children];
+    assert(!panel.hidden);
+    assert(original.hidden);
+    assert($('#jerryActionStatus').hidden);
+    assert.deepEqual(buttons.map(button => button.getAttribute('aria-label')), labels);
+    const before = save();
+    for (const button of room === 'bedroom' ? buttons.slice(2) : buttons) {
+      assert.equal(button.id, 'puppy-' + room + '-' + button.getAttribute('aria-label').toLowerCase());
+      slots.add(button.id);
+      button.click();
+      assert.equal($('#jerryLegacyClip'), null);
+      assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
+      assert(!$('#jerryActionStatus').hidden);
+      assert.deepEqual(save(), before);
+    }
+    click('[data-jerry-mode="3d"]');
+    assert(panel.hidden);
+    assert(!original.hidden);
+    assert.equal(original.innerHTML, markup);
+    assert($('#jerryActionStatus').hidden);
+    click('[data-jerry-mode="2d"]');
+    assert(!panel.hidden);
+  }
+  assert.equal(slots.size, 13);
+  click('[data-room="living"]');
+  assert(!original.hidden);
+  assert.equal(original.innerHTML, markup);
+});
+
+for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
+  test(stage + ' keeps the standard controls in Bedroom, Kitchen and Garden', t => {
+    const { $, click } = setup(t, xp);
+    for (const room of ['bedroom', 'kitchen', 'garden']) {
+      click('[data-room="' + room + '"]');
+      assert(!$('.scene-actions').hidden);
+      assert($('[data-puppy2d-room="' + room + '"]').hidden);
+    }
   });
 }

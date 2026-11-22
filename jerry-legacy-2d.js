@@ -48,18 +48,81 @@
     });
   }
   standardActions.after(bathroomPanel);
+  // Slot IDs stay room-specific. Set file when the matching clip is shipped.
+  const puppyActions = {
+    bedroom: [
+      { control: 'sleep' },
+      { control: 'ball' },
+      { id: 'puppy-bedroom-dress', label: 'Dress', icon: '👕', file: null },
+      { id: 'puppy-bedroom-jump', label: 'Jump', icon: '⬆️', file: null },
+      { id: 'puppy-bedroom-cuddle', label: 'Cuddle', icon: '🤗', file: null }
+    ],
+    kitchen: [
+      { id: 'puppy-kitchen-feed', label: 'Feed', icon: '🍖', file: null },
+      { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: null },
+      { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: null },
+      { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: null },
+      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: null }
+    ],
+    garden: [
+      { id: 'puppy-garden-house', label: 'House', icon: '🏠', file: null },
+      { id: 'puppy-garden-run', label: 'Run', icon: '💨', file: null },
+      { id: 'puppy-garden-fetch', label: 'Fetch', icon: '🎾', file: null },
+      { id: 'puppy-garden-dig', label: 'Dig', icon: '🐾', file: null },
+      { id: 'puppy-garden-explore', label: 'Explore', icon: '🔎', file: null }
+    ]
+  };
+  const puppyPanels = {};
+  for (const [room, actions] of Object.entries(puppyActions)) {
+    const panel = document.createElement('nav');
+    panel.className = 'scene-actions';
+    panel.dataset.puppy2dRoom = room;
+    panel.setAttribute('aria-label', room[0].toUpperCase() + room.slice(1) + ' actions');
+    panel.hidden = true;
+    for (const action of actions) {
+      const original = action.control && document.getElementById(action.control);
+      const button = original ? original.cloneNode(true) : document.createElement('button');
+      button.removeAttribute('id');
+      if (!original) {
+        button.id = action.id;
+        button.type = 'button';
+        button.setAttribute('aria-label', action.label);
+        const symbol = document.createElement('span');
+        symbol.className = 'action-icon';
+        symbol.setAttribute('aria-hidden', 'true');
+        symbol.textContent = action.icon;
+        button.append(symbol);
+      }
+      button.addEventListener('click', () => {
+        if (panel.hidden || button.disabled) return;
+        if (original) original.click();
+        else window.pawtopiaJerryVideo.play(action.id);
+      });
+      panel.append(button);
+    }
+    bathroomPanel.after(panel);
+    puppyPanels[room] = panel;
+  }
   let active;
 
   function context() {
     return [scene.dataset.growthStage, window.pawtopiaWorld.snapshot().world.room];
   }
 
-  function renderBathroomActions() {
-    const visible = window.pawtopiaJerryMode === '2d'
-      && window.pawtopiaWorld.snapshot().world.room === 'bathroom';
-    standardActions.hidden = visible;
+  function renderActions() {
+    const [stage, room] = context();
+    const is2d = window.pawtopiaJerryMode === '2d';
+    const visible = is2d && room === 'bathroom';
+    const puppy = stage === 'Puppy';
+    const puppyPanel = is2d && puppy ? puppyPanels[room] : undefined;
+    if (status.textContent === 'Coming soon'
+        && (!puppyPanel || puppyPanel.hidden)) status.hidden = true;
+    standardActions.hidden = visible || Boolean(puppyPanel);
     bathroomPanel.hidden = !visible;
-    const puppy = scene.dataset.growthStage === 'Puppy';
+    for (const panel of Object.values(puppyPanels)) {
+      panel.hidden = panel !== puppyPanel;
+      for (const button of panel.children) button.disabled = Boolean(active);
+    }
     for (const [index, button] of Array.from(bathroomPanel.children).entries()) {
       button.disabled = Boolean(active) || (Boolean(bathroomActions[index][2]) && !puppy);
     }
@@ -78,7 +141,7 @@
     layer.classList.remove('is-playing');
     scene.removeAttribute('data-care-busy');
     buttons.forEach(button => { button.disabled = false; });
-    renderBathroomActions();
+    renderActions();
     if (outcome === 'error') {
       status.textContent = 'Jerry’s ' + request.stage + ' ' + request.action + ' video could not play.';
       status.hidden = false;
@@ -92,8 +155,14 @@
       if (action === 'dress-show') return false;
       if (action === 'care') action = 'bath';
       const [stage, room] = context();
-      const puppyRoomFile = window.pawtopiaJerryMode === '2d' && stage === 'Puppy'
-        ? puppyRoomFiles[room]?.[action] : undefined;
+      const puppy2d = window.pawtopiaJerryMode === '2d' && stage === 'Puppy';
+      const slot = puppy2d ? puppyActions[room]?.find(entry => entry.id === action) : undefined;
+      if (slot && !slot.file) {
+        status.textContent = 'Coming soon';
+        status.hidden = false;
+        return true;
+      }
+      const puppyRoomFile = puppy2d ? slot?.file || puppyRoomFiles[room]?.[action] : undefined;
       const file = puppyRoomFile || videos[stage]?.[action];
       status.hidden = true;
       if (!file) {
@@ -106,7 +175,7 @@
       active = request;
       scene.setAttribute('data-care-busy', '');
       buttons.forEach(button => { button.disabled = true; });
-      renderBathroomActions();
+      renderActions();
       video.id = 'jerryLegacyClip';
       video.playsInline = true;
       video.muted = true;
@@ -147,7 +216,7 @@
   function cancel() { finish(active, 'cancelled'); }
   document.addEventListener('pawtopia-jerry-mode-change', () => {
     cancel();
-    renderBathroomActions();
+    renderActions();
   });
   document.addEventListener('pawtopia-restored', cancel);
   window.addEventListener('pagehide', cancel);
@@ -156,8 +225,8 @@
       const [stage, room] = context();
       if (stage !== active.stage || room !== active.room) cancel();
     }
-    renderBathroomActions();
+    renderActions();
   });
   // The mode switch is initialized by the following inline script.
-  document.addEventListener('DOMContentLoaded', renderBathroomActions, {once:true});
+  document.addEventListener('DOMContentLoaded', renderActions, {once:true});
 })();
