@@ -62,7 +62,7 @@
       { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: 'Puppy_Drink_Kitchen_4s_DeepCrop.mp4' },
       { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: 'Puppy_Treat_Kitchen_4s_DeepCrop.mp4' },
       { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4' },
-      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: 'Puppy_Snack_Kitchen_4s_DeepCrop.mp4' }
+      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: null }
     ],
     garden: [
       { id: 'puppy-garden-house', label: 'House', icon: '🏠', file: null },
@@ -103,6 +103,13 @@
     bathroomPanel.after(panel);
     puppyPanels[room] = panel;
   }
+  const babySnack = document.getElementById('puppy-kitchen-snack').cloneNode(true);
+  babySnack.id = 'baby-kitchen-snack';
+  babySnack.hidden = true;
+  babySnack.addEventListener('click', () => {
+    if (!babySnack.hidden && !babySnack.disabled) window.pawtopiaJerryVideo.play(babySnack.id);
+  });
+  standardActions.append(babySnack);
   let active;
 
   function context() {
@@ -117,6 +124,8 @@
     const puppyPanel = is2d && puppy ? puppyPanels[room] : undefined;
     if (status.textContent === 'Coming soon'
         && (!puppyPanel || puppyPanel.hidden)) status.hidden = true;
+    babySnack.hidden = !is2d || stage !== 'Baby' || room !== 'kitchen';
+    babySnack.disabled = Boolean(active);
     standardActions.hidden = visible || Boolean(puppyPanel);
     bathroomPanel.hidden = !visible;
     for (const panel of Object.values(puppyPanels)) {
@@ -155,7 +164,9 @@
       if (action === 'dress-show') return false;
       if (action === 'care') action = 'bath';
       const [stage, room] = context();
-      const puppy2d = window.pawtopiaJerryMode === '2d' && stage === 'Puppy';
+      const is2d = window.pawtopiaJerryMode === '2d';
+      const puppy2d = is2d && stage === 'Puppy';
+      const babyKitchenSnack = is2d && stage === 'Baby' && room === 'kitchen' && action === babySnack.id;
       const slot = puppy2d ? puppyActions[room]?.find(entry => entry.id === action) : undefined;
       if (slot && !slot.file) {
         status.textContent = 'Coming soon';
@@ -163,7 +174,7 @@
         return true;
       }
       const puppyRoomFile = puppy2d ? slot?.file || puppyRoomFiles[room]?.[action] : undefined;
-      const file = puppyRoomFile || videos[stage]?.[action];
+      const file = babyKitchenSnack ? 'Baby_Snack_Kitchen_4s_DeepCrop.mp4' : puppyRoomFile || videos[stage]?.[action];
       status.hidden = true;
       if (!file) {
         status.textContent = 'No ' + action + ' video is available for Jerry’s ' + stage + ' stage.';
@@ -178,8 +189,8 @@
       renderActions();
       video.id = 'jerryLegacyClip';
       video.playsInline = true;
-      video.muted = !slot;
-      if (slot) video.classList.add('puppy-room-action-clip');
+      video.muted = !slot && !babyKitchenSnack;
+      if (slot || babyKitchenSnack) video.classList.add('puppy-room-action-clip');
       video.setAttribute('aria-label', 'Jerry: ' + action);
       const reveal = () => {
         if (active === request) layer.classList.add('is-playing');

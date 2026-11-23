@@ -299,7 +299,7 @@ for (const [button, action] of [['#sleep', 'Sleep'], ['#ball', 'Play']]) {
 test('Puppy 2D room controls use distinct video slots and preserve the shared controls', t => {
   const { w, $, click, save } = setup(t, 100);
   const original = $('.scene-actions');
-  const markup = original.innerHTML;
+  const markup = [...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join('');
   const clips = {
     'puppy-bedroom-dress': 'Puppy_Dress_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-jump': 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4',
@@ -307,8 +307,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     'puppy-kitchen-feed': 'Puppy_Feed_Kitchen_4s_Cropped.mp4',
     'puppy-kitchen-drink': 'Puppy_Drink_Kitchen_4s_DeepCrop.mp4',
     'puppy-kitchen-treat': 'Puppy_Treat_Kitchen_4s_DeepCrop.mp4',
-    'puppy-kitchen-cook': 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4',
-    'puppy-kitchen-snack': 'Puppy_Snack_Kitchen_4s_DeepCrop.mp4'
+    'puppy-kitchen-cook': 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4'
   };
   const slots = new Set();
   w.fetch = () => assert.fail('An unfilled video slot must not request a clip');
@@ -357,7 +356,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     click('[data-jerry-mode="3d"]');
     assert(panel.hidden);
     assert(!original.hidden);
-    assert.equal(original.innerHTML, markup);
+    assert.equal([...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join(''), markup);
     assert($('#jerryActionStatus').hidden);
     click('[data-jerry-mode="2d"]');
     assert(!panel.hidden);
@@ -365,7 +364,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
   assert.equal(slots.size, 13);
   click('[data-room="living"]');
   assert(!original.hidden);
-  assert.equal(original.innerHTML, markup);
+  assert.equal([...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join(''), markup);
 });
 
 for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
@@ -378,3 +377,26 @@ for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
     }
   });
 }
+
+test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
+  const { w, $, click, save } = setup(t, 0);
+  const button = $('#baby-kitchen-snack');
+  assert(button.hidden);
+  click('[data-room="kitchen"]');
+  assert(!button.hidden);
+  const before = save();
+  click('#baby-kitchen-snack');
+  const clip = $('#jerryLegacyClip');
+  const source = 'assets/videos/baby/Baby_Snack_Kitchen_4s_DeepCrop.mp4';
+  assert(fs.existsSync(source));
+  assert.equal(clip.getAttribute('src'), source);
+  assert.equal(clip.muted, false);
+  assert(button.disabled);
+  clip.dispatchEvent(new w.Event('ended'));
+  assert.equal($('#jerryLegacyClip'), null);
+  assert(!button.disabled);
+  assert.deepEqual(save(), before);
+  click('[data-jerry-mode="3d"]');
+  assert(button.hidden);
+  assert.equal(w.pawtopiaJerryVideo.play(button.id), false);
+});
