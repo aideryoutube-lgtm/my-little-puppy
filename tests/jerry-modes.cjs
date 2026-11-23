@@ -304,7 +304,11 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     'puppy-bedroom-dress': 'Puppy_Dress_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-jump': 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-cuddle': 'Puppy_Cuddle_Bedroom_4s.mp4',
-    'puppy-kitchen-feed': 'Puppy_Feed_Kitchen_4s_Cropped.mp4'
+    'puppy-kitchen-feed': 'Puppy_Feed_Kitchen_4s_Cropped.mp4',
+    'puppy-kitchen-drink': 'Puppy_Drink_Kitchen_4s_DeepCrop.mp4',
+    'puppy-kitchen-treat': 'Puppy_Treat_Kitchen_4s_DeepCrop.mp4',
+    'puppy-kitchen-cook': 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4',
+    'puppy-kitchen-snack': 'Puppy_Snack_Kitchen_4s_DeepCrop.mp4'
   };
   const slots = new Set();
   w.fetch = () => assert.fail('An unfilled video slot must not request a clip');

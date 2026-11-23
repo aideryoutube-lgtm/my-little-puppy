@@ -59,10 +59,10 @@
     ],
     kitchen: [
       { id: 'puppy-kitchen-feed', label: 'Feed', icon: '🍖', file: 'Puppy_Feed_Kitchen_4s_Cropped.mp4' },
-      { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: null },
-      { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: null },
-      { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: null },
-      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: null }
+      { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: 'Puppy_Drink_Kitchen_4s_DeepCrop.mp4' },
+      { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: 'Puppy_Treat_Kitchen_4s_DeepCrop.mp4' },
+      { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4' },
+      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: 'Puppy_Snack_Kitchen_4s_DeepCrop.mp4' }
     ],
     garden: [
       { id: 'puppy-garden-house', label: 'House', icon: '🏠', file: null },
