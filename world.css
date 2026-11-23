@@ -409,6 +409,25 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Baby"] { --sprite-scale: .672; }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"] { --sprite-scale: 1.2304; }
+/* Puppy room anchors account for the transparent padding below and beside the paws. */
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="kitchen"] {
+  --sprite-center: 50.54%;
+  --sprite-floor: 19.71%;
+  --sprite-scale: 1.35344;
+}
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="bedroom"] {
+  --sprite-center: 50.4%;
+  --sprite-floor: 23.55%;
+}
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="bathroom"] {
+  --sprite-center: 50.72%;
+  --sprite-floor: 13.99%;
+  --sprite-scale: 1.513392;
+}
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="garden"] {
+  --sprite-center: 51.4%;
+  --sprite-floor: 19.55%;
+}
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Adult"] { --sprite-scale: 1.7; }
 @media (max-width: 350px) {
   #roomNav button { min-width: 0; }
