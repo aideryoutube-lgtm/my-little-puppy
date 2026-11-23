@@ -411,8 +411,8 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"] { --sprite-scale: 1.2304; }
 /* Puppy room anchors account for the transparent padding below and beside the paws. */
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="kitchen"] {
-  --sprite-center: 50.54%;
-  --sprite-floor: 19.71%;
+  --sprite-center: 50.04%;
+  --sprite-floor: 25.79%;
   --sprite-scale: 1.35344;
 }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="bedroom"] {
