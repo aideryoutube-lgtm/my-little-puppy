@@ -313,7 +313,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
   w.fetch = () => assert.fail('An unfilled video slot must not request a clip');
   const rooms = {
     bedroom: ['Sleep', 'Play', 'Dress', 'Jump', 'Cuddle'],
-    kitchen: ['Feed', 'Drink', 'Treat', 'Cook', 'Snack'],
+    kitchen: ['Feed', 'Drink', 'Treat', 'Cook', 'Cookie', 'Snack'],
     garden: ['House', 'Run', 'Fetch', 'Dig', 'Explore']
   };
   for (const [room, labels] of Object.entries(rooms)) {
@@ -329,7 +329,10 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
       assert.equal(button.id, 'puppy-' + room + '-' + button.getAttribute('aria-label').toLowerCase());
       slots.add(button.id);
       button.click();
-      if (clips[button.id]) {
+      if (button.id === 'puppy-kitchen-cookie') {
+        assert(button.disabled);
+        assert($('#jerryActionStatus').hidden);
+      } else if (clips[button.id]) {
         const video = $('#jerryLegacyClip');
         const source = 'assets/videos/puppy/' + clips[button.id];
         assert(fs.existsSync(source));
@@ -361,16 +364,16 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     click('[data-jerry-mode="2d"]');
     assert(!panel.hidden);
   }
-  assert.equal(slots.size, 13);
+  assert.equal(slots.size, 14);
   click('[data-room="living"]');
   assert(!original.hidden);
   assert.equal([...original.children].map(button => button.outerHTML).join(''), markup);
 });
 
 for (const [stage, xp] of [['Adult', 300]]) {
-  test(stage + ' keeps the standard controls in Bedroom, Kitchen and Garden', t => {
+  test(stage + ' keeps the standard controls in Bedroom and Garden', t => {
     const { $, click } = setup(t, xp);
-    for (const room of ['bedroom', 'kitchen', 'garden']) {
+    for (const room of ['bedroom', 'garden']) {
       click('[data-room="' + room + '"]');
       assert(!$('.scene-actions').hidden);
       assert($('[data-puppy2d-room="' + room + '"]').hidden);
@@ -402,7 +405,7 @@ test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
 });
 
 
-test('Baby 2D uses Puppy room labels and icons with a separate Cookie slot', t => {
+test('Baby 2D uses Puppy room labels and icons', t => {
   const { $, click, save } = setup(t, 0);
   const standard = $('.scene-actions');
   const labelsAndIcons = buttons => [...buttons].map(button =>
@@ -413,7 +416,6 @@ test('Baby 2D uses Puppy room labels and icons with a separate Cookie slot', t =
     const puppy = $('[data-puppy2d-room="' + room + '"]');
     assert(!baby.hidden && puppy.hidden && standard.hidden);
     const labels = labelsAndIcons(baby.children);
-    if (room === 'kitchen') assert.deepEqual(labels.pop(), ['Cookie', '🍪']);
     assert.deepEqual(labels, labelsAndIcons(puppy.children));
     const before = save();
     for (const button of baby.querySelectorAll('button[id]')) {
@@ -480,3 +482,47 @@ for (const [room, label, file, expected] of newBabyClips) {
     assert.deepEqual(save(), completed);
   });
 }
+
+
+for (const [stage, xp] of [['baby', 0], ['puppy', 100], ['adult', 300]]) {
+  test(stage + ' Kitchen ends with Cookie and Carrot Snack in 2D only', t => {
+    const { $, click } = setup(t, xp);
+    click('[data-room="kitchen"]');
+    const panel = $('[data-' + stage + '2d-room="kitchen"]');
+    assert(!panel.hidden);
+    const [cookie, carrot] = [...panel.children].slice(-2);
+    assert.equal(cookie.getAttribute('aria-label'), 'Cookie');
+    assert.equal(cookie.textContent, '🍪');
+    assert.equal(carrot.getAttribute('aria-label'), 'Snack');
+    assert.equal(carrot.textContent, '🥕');
+    assert.equal(cookie.disabled, stage !== 'baby');
+    carrot.click();
+    if (stage === 'baby') {
+      assert.match($('#jerryLegacyClip').getAttribute('src'), /Baby_Snack_Kitchen_4s_DeepCrop\.mp4$/);
+    } else {
+      assert.equal($('#jerryLegacyClip'), null);
+    }
+    if (stage === 'adult') {
+      panel.querySelector('[aria-label="Feed"]').click();
+      assert.match($('#jerryLegacyClip').getAttribute('src'), /adult\/Jerry_Adult_Feed\.mp4$/);
+    }
+    click('[data-jerry-mode="3d"]');
+    assert(panel.hidden);
+    assert(!$('.scene-actions').hidden);
+  });
+}
+
+test('the floating Kitchen Drink control is hidden in 2D and shown in 3D', t => {
+  const { w, $, click } = setup(t, 0);
+  const style = w.document.createElement('style');
+  style.textContent = fs.readFileSync('world.css', 'utf8');
+  w.document.head.append(style);
+  click('[data-room="kitchen"]');
+  const display = () => w.getComputedStyle($('.kitchen-bowl-controls')).display;
+  assert.equal(display(), 'none');
+  assert(!$('[data-baby2d-room="kitchen"] [aria-label="Drink"]').closest('[hidden]'));
+  click('[data-jerry-mode="3d"]');
+  assert.equal(display(), 'flex');
+  click('[data-jerry-mode="2d"]');
+  assert.equal(display(), 'none');
+});

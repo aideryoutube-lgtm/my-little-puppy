@@ -71,7 +71,8 @@
       { id: 'puppy-kitchen-drink', label: 'Drink', icon: '💧', file: 'Puppy_Drink_Kitchen_4s_DeepCrop.mp4' },
       { id: 'puppy-kitchen-treat', label: 'Treat', icon: '🦴', file: 'Puppy_Treat_Kitchen_4s_DeepCrop.mp4' },
       { id: 'puppy-kitchen-cook', label: 'Cook', icon: '🍳', file: 'Puppy_Cook_Kitchen_4s_DeepCrop.mp4' },
-      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🍪', file: null }
+      { id: 'puppy-kitchen-cookie', label: 'Cookie', icon: '🍪', unavailable: true },
+      { id: 'puppy-kitchen-snack', label: 'Snack', icon: '🥕', file: null }
     ],
     garden: [
       { id: 'puppy-garden-house', label: 'House', icon: '🏠', file: null },
@@ -81,7 +82,7 @@
       { id: 'puppy-garden-explore', label: 'Explore', icon: '🔎', file: null }
     ]
   };
-  const roomPanels = { Baby: {}, Puppy: {} };
+  const roomPanels = { Baby: {}, Puppy: {}, Adult: {} };
   const babyActions = {};
   for (const [room, actions] of Object.entries(puppyActions)) {
     babyActions[room] = actions.map(action => {
@@ -92,16 +93,20 @@
         ...(name === 'feed' ? { control: 'food' } : {}),
         id: 'baby-' + room + '-' + name,
         name,
+        unavailable: false,
         file: babyRoomFiles[room]?.[name]
       };
     });
   }
-  babyActions.kitchen.push({
-    id: 'baby-kitchen-cookie', name: 'cookie', label: 'Cookie', icon: '🍪',
-    file: babyRoomFiles.kitchen.cookie
-  });
+  const adultActions = {
+    kitchen: [
+      ...Array.from(buttons, button => ({ control: button.id })),
+      { id: 'adult-kitchen-cookie', label: 'Cookie', icon: '🍪', unavailable: true },
+      { id: 'adult-kitchen-snack', label: 'Snack', icon: '🥕', unavailable: true }
+    ]
+  };
 
-  for (const [stage, rooms] of Object.entries({ Baby: babyActions, Puppy: puppyActions })) {
+  for (const [stage, rooms] of Object.entries({ Baby: babyActions, Puppy: puppyActions, Adult: adultActions })) {
     for (const [room, actions] of Object.entries(rooms)) {
       const panel = document.createElement('nav');
       panel.className = 'scene-actions';
@@ -122,9 +127,11 @@
           symbol.textContent = action.icon;
           button.append(symbol);
         }
+        if (action.unavailable) button.dataset.unavailable = '';
+        if (stage === 'Adult' && action.control === 'home') button.dataset.adultHouse = '';
         button.addEventListener('click', () => {
           if (panel.hidden || button.disabled) return;
-          if (original && (stage === 'Puppy' || !action.name || action.file)) original.click();
+          if (original && (!action.name || action.file)) original.click();
           else window.pawtopiaJerryVideo.play(action.id);
         });
         panel.append(button);
@@ -150,10 +157,16 @@
         && !(visible && stage === 'Baby' && !bathroomPanel.hidden)) status.hidden = true;
     standardActions.hidden = visible || Boolean(roomPanel);
     bathroomPanel.hidden = !visible;
+    if (roomPanel === roomPanels.Adult.kitchen) {
+      const { hasHome } = window.pawtopiaWorld.snapshot();
+      roomPanel.querySelector('[data-adult-house]').setAttribute('aria-label', hasHome ? 'House — owned' : 'House');
+    }
     for (const panels of Object.values(roomPanels)) {
       for (const panel of Object.values(panels)) {
         panel.hidden = panel !== roomPanel;
-        for (const button of panel.children) button.disabled = Boolean(active);
+        for (const button of panel.children) {
+          button.disabled = Boolean(active) || button.hasAttribute('data-unavailable');
+        }
       }
     }
     for (const [index, button] of Array.from(bathroomPanel.children).entries()) {
@@ -195,6 +208,7 @@
       const babySlot = baby2d ? babyActions[room]?.find(entry => entry.id === action) : undefined;
       const missingBabyBath = baby2d && room === 'bathroom' &&
         bathroomActions.some(([label, , file]) => file && label.toLowerCase() === action);
+      if (slot?.unavailable) return true;
       if ((slot && !slot.file) || (babySlot && !babySlot.file) || missingBabyBath) {
         status.textContent = 'Coming soon';
         status.hidden = false;
