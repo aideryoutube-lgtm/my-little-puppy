@@ -189,7 +189,7 @@ test('only 2D Bathroom shows the five icon controls and routes Puppy clips', asy
   assert.equal($('#jerryLegacyClip').getAttribute('src'), 'assets/videos/silent/puppy/Jerry_Puppy_Bath.mp4');
 });
 
-for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
+for (const [stage, xp] of [['Adult', 300]]) {
   test(stage + ' Bathroom keeps Bath and disables the four Puppy actions', t => {
     const { $, click } = setup(t, xp);
     click('[data-room="bathroom"]');
@@ -299,7 +299,7 @@ for (const [button, action] of [['#sleep', 'Sleep'], ['#ball', 'Play']]) {
 test('Puppy 2D room controls use distinct video slots and preserve the shared controls', t => {
   const { w, $, click, save } = setup(t, 100);
   const original = $('.scene-actions');
-  const markup = [...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join('');
+  const markup = [...original.children].map(button => button.outerHTML).join('');
   const clips = {
     'puppy-bedroom-dress': 'Puppy_Dress_Bedroom_4s_DeepCrop.mp4',
     'puppy-bedroom-jump': 'Puppy_Jump_Bedroom_4s_DeepCrop.mp4',
@@ -356,7 +356,7 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     click('[data-jerry-mode="3d"]');
     assert(panel.hidden);
     assert(!original.hidden);
-    assert.equal([...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join(''), markup);
+    assert.equal([...original.children].map(button => button.outerHTML).join(''), markup);
     assert($('#jerryActionStatus').hidden);
     click('[data-jerry-mode="2d"]');
     assert(!panel.hidden);
@@ -364,10 +364,10 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
   assert.equal(slots.size, 13);
   click('[data-room="living"]');
   assert(!original.hidden);
-  assert.equal([...original.children].filter(button => button.id !== 'baby-kitchen-snack').map(button => button.outerHTML).join(''), markup);
+  assert.equal([...original.children].map(button => button.outerHTML).join(''), markup);
 });
 
-for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
+for (const [stage, xp] of [['Adult', 300]]) {
   test(stage + ' keeps the standard controls in Bedroom, Kitchen and Garden', t => {
     const { $, click } = setup(t, xp);
     for (const room of ['bedroom', 'kitchen', 'garden']) {
@@ -381,9 +381,9 @@ for (const [stage, xp] of [['Baby', 0], ['Adult', 300]]) {
 test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
   const { w, $, click, save } = setup(t, 0);
   const button = $('#baby-kitchen-snack');
-  assert(button.hidden);
+  assert(button.parentElement.hidden);
   click('[data-room="kitchen"]');
-  assert(!button.hidden);
+  assert(!button.parentElement.hidden);
   const before = save();
   click('#baby-kitchen-snack');
   const clip = $('#jerryLegacyClip');
@@ -397,6 +397,86 @@ test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
   assert(!button.disabled);
   assert.deepEqual(save(), before);
   click('[data-jerry-mode="3d"]');
-  assert(button.hidden);
+  assert(button.parentElement.hidden);
   assert.equal(w.pawtopiaJerryVideo.play(button.id), false);
 });
+
+
+test('Baby 2D uses Puppy room labels and icons with a separate Cookie slot', t => {
+  const { $, click, save } = setup(t, 0);
+  const standard = $('.scene-actions');
+  const labelsAndIcons = buttons => [...buttons].map(button =>
+    [button.getAttribute('aria-label'), button.textContent]);
+  for (const room of ['kitchen', 'bedroom', 'garden']) {
+    click('[data-room="' + room + '"]');
+    const baby = $('[data-baby2d-room="' + room + '"]');
+    const puppy = $('[data-puppy2d-room="' + room + '"]');
+    assert(!baby.hidden && puppy.hidden && standard.hidden);
+    const labels = labelsAndIcons(baby.children);
+    if (room === 'kitchen') assert.deepEqual(labels.pop(), ['Cookie', '🍪']);
+    assert.deepEqual(labels, labelsAndIcons(puppy.children));
+    const before = save();
+    for (const button of baby.querySelectorAll('button[id]')) {
+      if (['Feed', 'Drink', 'Cookie', 'Snack'].includes(button.getAttribute('aria-label'))) continue;
+      button.click();
+      assert.equal($('#jerryLegacyClip'), null);
+      assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
+      assert.deepEqual(save(), before);
+    }
+    click('[data-jerry-mode="3d"]');
+    assert(baby.hidden && !standard.hidden);
+    click('[data-jerry-mode="2d"]');
+  }
+  click('[data-room="bathroom"]');
+  const [bath, ...missing] = $('#bathroom2dActions').children;
+  for (const button of missing) {
+    assert(!button.disabled);
+    button.click();
+    assert.equal($('#jerryLegacyClip'), null);
+    assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
+  }
+  bath.click();
+  assert.equal($('#jerryLegacyClip').getAttribute('src'), 'assets/videos/silent/baby/Jerry_Baby_Bath.mp4');
+});
+
+const newBabyClips = [
+  ['kitchen', 'Feed', 'Baby_Feed_Kitchen_4s.mp4', { hunger: 80, feedCount: 1, xp: 10 }],
+  ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 0 }],
+  ['kitchen', 'Cookie', 'Baby_Cookie_Kitchen_4s.mp4', { hunger: 55, xp: 0 }],
+  ['bedroom', 'Sleep', 'Baby_Sleep_Bedroom_4s.mp4', { energy: 100, xp: 10 }]
+];
+for (const [room, label, file, expected] of newBabyClips) {
+  test('Baby ' + room + ' ' + label + ' plays with sound and applies effects once', t => {
+    const { w, $, click, save } = setup(t, 0);
+    click('[data-room="' + room + '"]');
+    const button = $('[data-baby2d-room="' + room + '"] [aria-label="' + label + '"]');
+    const before = save();
+    button.click();
+    const failed = $('#jerryLegacyClip');
+    failed.dispatchEvent(new w.Event('error'));
+    assert.deepEqual(save(), before);
+    button.click();
+    const video = $('#jerryLegacyClip');
+    const path = 'assets/videos/baby/' + file;
+    assert(fs.existsSync(path));
+    assert.equal(video.getAttribute('src'), path);
+    assert.equal(video.playsInline, true);
+    assert.equal(video.muted, false);
+    assert.equal(video.loop, false);
+    assert(button.disabled);
+    button.click();
+    assert.equal($('#jerryLegacyClip'), video);
+    assert.deepEqual(save(), before);
+    video.dispatchEvent(new w.Event('playing'));
+    assert($('#jerryVideoLayer').classList.contains('is-playing'));
+    video.dispatchEvent(new w.Event('ended'));
+    assert.equal($('#jerryLegacyClip'), null);
+    assert(!$('#jerryVideoLayer').classList.contains('is-playing'));
+    assert(!button.disabled);
+    assert.equal(w.pawtopiaWorld.snapshot().world.room, room);
+    for (const [key, value] of Object.entries(expected)) assert.equal(save()[key], value);
+    const completed = save();
+    video.dispatchEvent(new w.Event('ended'));
+    assert.deepEqual(save(), completed);
+  });
+}
