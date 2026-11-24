@@ -526,3 +526,31 @@ test('the floating Kitchen Drink control is hidden in 2D and shown in 3D', t => 
   click('[data-jerry-mode="2d"]');
   assert.equal(display(), 'none');
 });
+
+for (const [stage, xp] of [['baby', 0], ['puppy', 100], ['adult', 300]]) {
+  test(stage + ' Kitchen uses the water bowl icon for Feed without changing playback', t => {
+    const { $, click } = setup(t, xp);
+    click('[data-room="kitchen"]');
+    const panel = $('[data-' + stage + '2d-room="kitchen"]');
+    const [feed, next] = panel.children;
+    const icon = feed.querySelector('img');
+    assert.equal(feed.getAttribute('aria-label'), 'Feed');
+    assert.equal(icon.getAttribute('src'), 'assets/rooms/kitchen-water-bowl.svg');
+    assert(fs.existsSync(icon.getAttribute('src')));
+    assert.equal(icon.alt, '');
+    if (stage !== 'adult') assert.equal(next.textContent, '💧');
+    else assert.equal(next.textContent, '💤');
+
+    feed.click();
+    const clip = $('#jerryLegacyClip');
+    const files = {
+      baby: 'Baby_Feed_Kitchen_4s.mp4',
+      puppy: 'Puppy_Feed_Kitchen_4s_Cropped.mp4',
+      adult: 'Jerry_Adult_Feed.mp4'
+    };
+    assert.equal(clip.getAttribute('src'), 'assets/videos/' + stage + '/' + files[stage]);
+    click('[data-jerry-mode="3d"]');
+    assert(panel.hidden);
+    assert.equal($('#food').textContent, '🍖');
+  });
+}

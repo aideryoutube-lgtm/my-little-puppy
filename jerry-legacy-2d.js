@@ -127,6 +127,14 @@
           symbol.textContent = action.icon;
           button.append(symbol);
         }
+        if (room === 'kitchen' && button.getAttribute('aria-label') === 'Feed') {
+          const bowl = document.createElement('img');
+          bowl.src = 'assets/rooms/kitchen-water-bowl.svg';
+          bowl.alt = '';
+          bowl.width = 28;
+          bowl.height = 23;
+          button.replaceChildren(bowl);
+        }
         if (action.unavailable) button.dataset.unavailable = '';
         if (stage === 'Adult' && action.control === 'home') button.dataset.adultHouse = '';
         button.addEventListener('click', () => {
