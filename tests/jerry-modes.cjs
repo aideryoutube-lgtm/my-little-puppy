@@ -419,7 +419,7 @@ test('Baby 2D uses Puppy room labels and icons', t => {
     assert.deepEqual(labels, labelsAndIcons(puppy.children));
     const before = save();
     for (const button of baby.querySelectorAll('button[id]')) {
-      if (['Feed', 'Drink', 'Cookie', 'Snack'].includes(button.getAttribute('aria-label'))) continue;
+      if (room === 'bedroom' || ['Feed', 'Drink', 'Cookie', 'Snack'].includes(button.getAttribute('aria-label'))) continue;
       button.click();
       assert.equal($('#jerryLegacyClip'), null);
       assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
@@ -445,7 +445,11 @@ const newBabyClips = [
   ['kitchen', 'Feed', 'Baby_Feed_Kitchen_4s.mp4', { hunger: 80, feedCount: 1, xp: 10 }],
   ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 0 }],
   ['kitchen', 'Cookie', 'Baby_Cookie_Kitchen_4s.mp4', { hunger: 55, xp: 0 }],
-  ['bedroom', 'Sleep', 'Baby_Sleep_Bedroom_4s.mp4', { energy: 100, xp: 10 }]
+  ['bedroom', 'Sleep', 'Baby_Sleep_Bedroom_4s.mp4', { energy: 100, xp: 10 }],
+  ['bedroom', 'Play', 'Baby_Play_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }],
+  ['bedroom', 'Dress', 'Baby_Dress_Bedroom_4s.mp4', { xp: 0 }],
+  ['bedroom', 'Jump', 'Baby_Jump_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }],
+  ['bedroom', 'Cuddle', 'Baby_Cuddle_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }]
 ];
 for (const [room, label, file, expected] of newBabyClips) {
   test('Baby ' + room + ' ' + label + ' plays with sound and applies effects once', t => {
@@ -466,6 +470,14 @@ for (const [room, label, file, expected] of newBabyClips) {
     assert.equal(video.muted, false);
     assert.equal(video.loop, false);
     assert(button.disabled);
+    assert($('#jerryActionStatus').hidden);
+    if (room === 'bedroom') {
+      const panel = button.closest('nav');
+      assert.deepEqual(Array.from(panel.children, control => control.getAttribute('aria-label')),
+        ['Sleep', 'Play', 'Dress', 'Jump', 'Cuddle']);
+      assert(Array.from(panel.children).every(control => control.disabled));
+      assert.equal(video.classList.contains('baby-bedroom-action-clip'), label !== 'Sleep');
+    }
     button.click();
     assert.equal($('#jerryLegacyClip'), video);
     assert.deepEqual(save(), before);

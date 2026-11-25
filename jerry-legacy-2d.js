@@ -32,7 +32,13 @@
       snack: 'Baby_Snack_Kitchen_4s_DeepCrop.mp4',
       cookie: 'Baby_Cookie_Kitchen_4s.mp4'
     },
-    bedroom: { sleep: 'Baby_Sleep_Bedroom_4s.mp4' }
+    bedroom: {
+      sleep: 'Baby_Sleep_Bedroom_4s.mp4',
+      play: 'Baby_Play_Bedroom_4s.mp4',
+      dress: 'Baby_Dress_Bedroom_4s.mp4',
+      jump: 'Baby_Jump_Bedroom_4s.mp4',
+      cuddle: 'Baby_Cuddle_Bedroom_4s.mp4'
+    }
   };
   const puppyRoomFiles = {
     bathroom: { bath: 'Puppy_Bath_Bathroom_4s.mp4' },
@@ -140,7 +146,9 @@
         button.addEventListener('click', () => {
           if (panel.hidden || button.disabled) return;
           if (original && (!action.name || action.file)) original.click();
-          else window.pawtopiaJerryVideo.play(action.id);
+          else if (stage === 'Baby' && room === 'bedroom' && (action.name === 'jump' || action.name === 'cuddle')) {
+            window.pawtopiaWorld.playBedroomActivity(action.id);
+          } else window.pawtopiaJerryVideo.play(action.id);
         });
         panel.append(button);
       }
@@ -248,6 +256,9 @@
       video.playsInline = true;
       video.muted = !slot && !babyRoomFile;
       if (slot) video.classList.add('puppy-room-action-clip');
+      if (babyRoomFile && room === 'bedroom' && action !== 'sleep') {
+        video.classList.add('baby-bedroom-action-clip');
+      }
       video.setAttribute('aria-label', 'Jerry: ' + action);
       const reveal = () => {
         if (active === request) layer.classList.add('is-playing');

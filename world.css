@@ -391,6 +391,7 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 #roomCanvas:has(> #jerryVideoLayer.is-playing > .puppy-room-action-clip){aspect-ratio:auto}
 #jerryVideoLayer.is-playing:has(> .puppy-room-action-clip){position:relative;inset:auto;z-index:15}
 #jerryVideoLayer.is-playing > #jerryLegacyClip.puppy-room-action-clip{height:auto}
+#jerryLegacyClip.baby-bedroom-action-clip{object-fit:fill}
 #jerryModeSwitch button{min-height:44px;min-width:44px}
 
 /* Keep the existing 3D poses and scale only the 2D sprites around their paws. */
@@ -412,6 +413,12 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Baby"][data-room="living"] {
   --sprite-center: 51.01%;
   --sprite-floor: 33.97%;
+}
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Baby"][data-room="bedroom"] {
+  /* Match the center, paws and height across the four Bedroom opening frames. */
+  --sprite-center: 49.9%;
+  --sprite-floor: 33.5%;
+  --sprite-scale: .54;
 }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"] { --sprite-scale: 1.2304; }
 /* Puppy room anchors account for the transparent padding below and beside the paws. */
