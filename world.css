@@ -421,9 +421,10 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
   --sprite-scale: .54;
 }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Baby"][data-room="bathroom"] {
-  /* Align the visible paws with the Bathroom reference, including sprite padding. */
-  --sprite-center: 50.8%;
-  --sprite-floor: 24.4%;
+  /* Match the four Bathroom opening frames as displayed by the video layer. */
+  --sprite-center: 50%;
+  --sprite-floor: 24.7%;
+  --sprite-scale: .805;
 }
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"] { --sprite-scale: 1.2304; }
 /* Puppy room anchors account for the transparent padding below and beside the paws. */

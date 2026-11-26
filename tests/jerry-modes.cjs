@@ -429,19 +429,33 @@ test('Baby 2D uses Puppy room labels and icons', t => {
     assert(baby.hidden && !standard.hidden);
     click('[data-jerry-mode="2d"]');
   }
+});
+
+test('Baby Bathroom keeps the five icon controls and Mirror placeholder', t => {
+  const { $, click, save } = setup(t, 0);
   click('[data-room="bathroom"]');
-  const [bath, ...missing] = $('#bathroom2dActions').children;
-  for (const button of missing) {
-    assert(!button.disabled);
-    button.click();
-    assert.equal($('#jerryLegacyClip'), null);
-    assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
-  }
-  bath.click();
-  assert.equal($('#jerryLegacyClip').getAttribute('src'), 'assets/videos/silent/baby/Jerry_Baby_Bath.mp4');
+  const panel = $('#bathroom2dActions');
+  assert(!panel.hidden);
+  assert.deepEqual(Array.from(panel.children, button => button.getAttribute('aria-label')),
+    ['Bath', 'Bubbles', 'Brush', 'Dry', 'Mirror']);
+  assert(Array.from(panel.children).every(button =>
+    button.children.length === 1 && button.firstElementChild.getAttribute('aria-hidden') === 'true'));
+  const mirror = panel.lastElementChild;
+  const before = save();
+  assert(!mirror.disabled);
+  mirror.click();
+  assert.equal($('#jerryLegacyClip'), null);
+  assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
+  assert.deepEqual(save(), before);
+  click('[data-jerry-mode="3d"]');
+  assert(panel.hidden);
 });
 
 const newBabyClips = [
+  ...['Bath', 'Bubbles', 'Brush', 'Dry'].map(label => [
+    'bathroom', label, 'Baby_' + label + '_Bathroom_4s.mp4',
+    { clean: 90, xp: 10, bathCount: label === 'Bath' ? 1 : 0 }
+  ]),
   ['kitchen', 'Feed', 'Baby_Feed_Kitchen_4s.mp4', { hunger: 80, feedCount: 1, xp: 10 }],
   ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 0 }],
   ['kitchen', 'Cookie', 'Baby_Cookie_Kitchen_4s.mp4', { hunger: 55, xp: 0 }],
@@ -455,7 +469,8 @@ for (const [room, label, file, expected] of newBabyClips) {
   test('Baby ' + room + ' ' + label + ' plays with sound and applies effects once', t => {
     const { w, $, click, save } = setup(t, 0);
     click('[data-room="' + room + '"]');
-    const button = $('[data-baby2d-room="' + room + '"] [aria-label="' + label + '"]');
+    const panel = room === 'bathroom' ? $('#bathroom2dActions') : $('[data-baby2d-room="' + room + '"]');
+    const button = panel.querySelector('[aria-label="' + label + '"]');
     const before = save();
     button.click();
     const failed = $('#jerryLegacyClip');
@@ -471,8 +486,10 @@ for (const [room, label, file, expected] of newBabyClips) {
     assert.equal(video.loop, false);
     assert(button.disabled);
     assert($('#jerryActionStatus').hidden);
+    if (room === 'bathroom') {
+      assert(Array.from(panel.children).every(control => control.disabled));
+    }
     if (room === 'bedroom') {
-      const panel = button.closest('nav');
       assert.deepEqual(Array.from(panel.children, control => control.getAttribute('aria-label')),
         ['Sleep', 'Play', 'Dress', 'Jump', 'Cuddle']);
       assert(Array.from(panel.children).every(control => control.disabled));

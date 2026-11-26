@@ -32,6 +32,12 @@
       snack: 'Baby_Snack_Kitchen_4s_DeepCrop.mp4',
       cookie: 'Baby_Cookie_Kitchen_4s.mp4'
     },
+    bathroom: {
+      bath: 'Baby_Bath_Bathroom_4s.mp4',
+      bubbles: 'Baby_Bubbles_Bathroom_4s.mp4',
+      brush: 'Baby_Brush_Bathroom_4s.mp4',
+      dry: 'Baby_Dry_Bathroom_4s.mp4'
+    },
     bedroom: {
       sleep: 'Baby_Sleep_Bedroom_4s.mp4',
       play: 'Baby_Play_Bedroom_4s.mp4',
@@ -58,7 +64,9 @@
     if (file) puppyRoomFiles.bathroom[action] = file;
     button.addEventListener('click', () => {
       if (bathroomPanel.hidden || button.disabled) return;
-      if (file) window.pawtopiaJerryVideo.play(action);
+      if (scene.dataset.growthStage === 'Baby' && file && babyRoomFiles.bathroom[action]) {
+        window.pawtopiaWorld.playBathroomActivity(action);
+      } else if (file) window.pawtopiaJerryVideo.play(action);
       else document.getElementById('bath').click();
     });
   }
@@ -222,10 +230,9 @@
       const baby2d = is2d && stage === 'Baby';
       const slot = puppy2d ? puppyActions[room]?.find(entry => entry.id === action) : undefined;
       const babySlot = baby2d ? babyActions[room]?.find(entry => entry.id === action) : undefined;
-      const missingBabyBath = baby2d && room === 'bathroom' &&
-        bathroomActions.some(([label, , file]) => file && label.toLowerCase() === action);
+      const missingBabyMirror = baby2d && room === 'bathroom' && action === 'mirror';
       if (slot?.unavailable) return true;
-      if ((slot && !slot.file) || (babySlot && !babySlot.file) || missingBabyBath) {
+      if ((slot && !slot.file) || (babySlot && !babySlot.file) || missingBabyMirror) {
         status.textContent = 'Coming soon';
         status.hidden = false;
         return true;
