@@ -426,6 +426,12 @@ html[data-effects=minimal] .water-stream i,html[data-effects=minimal] #kitchenBo
   --sprite-floor: 24.7%;
   --sprite-scale: .805;
 }
+[data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Baby"][data-room="garden"] {
+  /* The Garden reference places the visible paws at 76% of the room height. */
+  --sprite-center: 58.85%;
+  --sprite-floor: 22.45%;
+  --sprite-scale: .805;
+}
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"] { --sprite-scale: 1.2304; }
 /* Puppy room anchors account for the transparent padding below and beside the paws. */
 [data-jerry-display-mode="2d"] #scene #roomJerry[data-stage="Puppy"][data-room="kitchen"] {

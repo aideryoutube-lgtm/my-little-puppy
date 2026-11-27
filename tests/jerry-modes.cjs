@@ -405,7 +405,7 @@ test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
 });
 
 
-test('Baby 2D uses Puppy room labels and icons', t => {
+test('Baby 2D keeps room icons and uses Ball and Walk labels in Garden', t => {
   const { $, click, save } = setup(t, 0);
   const standard = $('.scene-actions');
   const labelsAndIcons = buttons => [...buttons].map(button =>
@@ -416,10 +416,14 @@ test('Baby 2D uses Puppy room labels and icons', t => {
     const puppy = $('[data-puppy2d-room="' + room + '"]');
     assert(!baby.hidden && puppy.hidden && standard.hidden);
     const labels = labelsAndIcons(baby.children);
-    assert.deepEqual(labels, labelsAndIcons(puppy.children));
+    if (room === 'garden') {
+      assert.deepEqual(labels, [['House', '🏠'], ['Run', '💨'], ['Ball', '🎾'], ['Walk', '🐾'], ['Explore', '🔎']]);
+    } else {
+      assert.deepEqual(labels, labelsAndIcons(puppy.children));
+    }
     const before = save();
     for (const button of baby.querySelectorAll('button[id]')) {
-      if (room === 'bedroom' || ['Feed', 'Drink', 'Cookie', 'Snack'].includes(button.getAttribute('aria-label'))) continue;
+      if (room === 'bedroom' || ['Feed', 'Drink', 'Cookie', 'Snack', 'House', 'Run', 'Ball'].includes(button.getAttribute('aria-label'))) continue;
       button.click();
       assert.equal($('#jerryLegacyClip'), null);
       assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
@@ -431,8 +435,8 @@ test('Baby 2D uses Puppy room labels and icons', t => {
   }
 });
 
-test('Baby Bathroom keeps the five icon controls and Mirror placeholder', t => {
-  const { $, click, save } = setup(t, 0);
+test('Baby Bathroom keeps the five icon controls', t => {
+  const { $, click } = setup(t, 0);
   click('[data-room="bathroom"]');
   const panel = $('#bathroom2dActions');
   assert(!panel.hidden);
@@ -441,20 +445,18 @@ test('Baby Bathroom keeps the five icon controls and Mirror placeholder', t => {
   assert(Array.from(panel.children).every(button =>
     button.children.length === 1 && button.firstElementChild.getAttribute('aria-hidden') === 'true'));
   const mirror = panel.lastElementChild;
-  const before = save();
   assert(!mirror.disabled);
-  mirror.click();
-  assert.equal($('#jerryLegacyClip'), null);
-  assert.equal($('#jerryActionStatus').textContent, 'Coming soon');
-  assert.deepEqual(save(), before);
   click('[data-jerry-mode="3d"]');
   assert(panel.hidden);
 });
 
 const newBabyClips = [
-  ...['Bath', 'Bubbles', 'Brush', 'Dry'].map(label => [
+  ...['Bath', 'Bubbles', 'Brush', 'Dry', 'Mirror'].map(label => [
     'bathroom', label, 'Baby_' + label + '_Bathroom_4s.mp4',
     { clean: 90, xp: 10, bathCount: label === 'Bath' ? 1 : 0 }
+  ]),
+  ...['House', 'Run', 'Ball'].map(label => [
+    'garden', label, 'Baby_' + label + '_Garden_4s.mp4', { xp: 0, playCount: 0, fun: 50 }
   ]),
   ['kitchen', 'Feed', 'Baby_Feed_Kitchen_4s.mp4', { hunger: 80, feedCount: 1, xp: 10 }],
   ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 0 }],
@@ -486,7 +488,7 @@ for (const [room, label, file, expected] of newBabyClips) {
     assert.equal(video.loop, false);
     assert(button.disabled);
     assert($('#jerryActionStatus').hidden);
-    if (room === 'bathroom') {
+    if (room === 'bathroom' || room === 'garden') {
       assert(Array.from(panel.children).every(control => control.disabled));
     }
     if (room === 'bedroom') {

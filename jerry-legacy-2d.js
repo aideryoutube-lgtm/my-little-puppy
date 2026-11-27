@@ -36,7 +36,13 @@
       bath: 'Baby_Bath_Bathroom_4s.mp4',
       bubbles: 'Baby_Bubbles_Bathroom_4s.mp4',
       brush: 'Baby_Brush_Bathroom_4s.mp4',
-      dry: 'Baby_Dry_Bathroom_4s.mp4'
+      dry: 'Baby_Dry_Bathroom_4s.mp4',
+      mirror: 'Baby_Mirror_Bathroom_4s.mp4'
+    },
+    garden: {
+      house: 'Baby_House_Garden_4s.mp4',
+      run: 'Baby_Run_Garden_4s.mp4',
+      fetch: 'Baby_Ball_Garden_4s.mp4'
     },
     bedroom: {
       sleep: 'Baby_Sleep_Bedroom_4s.mp4',
@@ -104,6 +110,8 @@
       const name = action.control === 'ball' ? 'play' : action.label.toLowerCase();
       return {
         ...action,
+        ...(room === 'garden' && name === 'fetch' ? { label: 'Ball' } : {}),
+        ...(room === 'garden' && name === 'dig' ? { label: 'Walk' } : {}),
         ...(name === 'feed' ? { control: 'food' } : {}),
         id: 'baby-' + room + '-' + name,
         name,
@@ -230,9 +238,8 @@
       const baby2d = is2d && stage === 'Baby';
       const slot = puppy2d ? puppyActions[room]?.find(entry => entry.id === action) : undefined;
       const babySlot = baby2d ? babyActions[room]?.find(entry => entry.id === action) : undefined;
-      const missingBabyMirror = baby2d && room === 'bathroom' && action === 'mirror';
       if (slot?.unavailable) return true;
-      if ((slot && !slot.file) || (babySlot && !babySlot.file) || missingBabyMirror) {
+      if ((slot && !slot.file) || (babySlot && !babySlot.file)) {
         status.textContent = 'Coming soon';
         status.hidden = false;
         return true;
