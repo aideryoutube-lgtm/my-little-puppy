@@ -672,13 +672,19 @@ function advanceCare() {
   sleep?.finishSleep?.();
 }
 
+let finishTouch;
 function finished() {
   // Care advances through its frame tracker. Walk and Happy return to Idle
   // directly on the renderer's one-shot completion event.
-  if (!care && (clip === 'Walk' || clip === 'Happy')) idle();
+  if (!care && (clip === 'Walk' || clip === 'Happy')) {
+    const complete = clip === 'Happy' ? finishTouch : undefined;
+    idle();
+    complete?.();
+  }
 }
 
 function idle() {
+  finishTouch = undefined;
   clearTimeout(walkTimer);
   play('Idle');
   if (motionReduced() || document.hidden) return;
@@ -761,6 +767,7 @@ function sync() {
     currentRoom = room;
     viewer.hidden = !show;
     if (!show && changed) {
+      finishTouch = undefined;
       stopCare('Baby viewer hidden');
       viewer.pause();
     } else if (show && ready) {
@@ -780,15 +787,17 @@ scene.addEventListener('pawtopia-jerry-action', event => {
   const config = Object.hasOwn(careActions, action) ? careActions[action] :
     action === 'dress-show' ? { room: origin, clips: ['DressTurn'] } : undefined;
   if (!config && action !== 'touch') return;
-  if ((finishMeal || finishSleep || finishAction) && care) event.preventDefault();
+  event.preventDefault();
   if (failed || care || viewer?.hidden || motionReduced() || (action === 'feed' && foodFailed)) {
     careDebug('Ignored ' + action + ': ' + (care ? 'busy' : 'viewer or motion setting'));
+    if (!care) (finishMeal || finishSleep || finishAction)?.(false);
     return;
   }
   if (action === 'touch') {
-    if (!ready || !clip || clip === 'Happy') return;
+    if (!ready || !clip || clip === 'Happy' || !viewer.availableAnimations?.includes('Happy')) return;
     clearTimeout(walkTimer);
-    play('Happy');
+    finishTouch = finishAction;
+    play('Happy').catch(() => { finishTouch = undefined; });
     return;
   }
   if (action === 'house' && !window.pawtopiaWorld?.snapshot().hasHome) {
@@ -801,9 +810,9 @@ scene.addEventListener('pawtopia-jerry-action', event => {
   }
   if (roomBlocked()) {
     careDebug('Ignored ' + action + ': room blocked');
+    (finishMeal || finishSleep || finishAction)?.(false);
     return;
   }
-  if (finishMeal || finishSleep || finishAction) event.preventDefault();
   clearTimeout(walkTimer);
   care = { ...config, action, origin, finishMeal, finishSleep, finishAction, index: 0, state: 'WaitingForRoom' };
   syncTestBaby();
@@ -843,6 +852,7 @@ new MutationObserver(syncMotion).observe(document.documentElement, {
 });
 
 window.addEventListener('pagehide', () => {
+  finishTouch = undefined;
   if (care) stopCare('Page closed');
   clearTimeout(walkTimer);
 });

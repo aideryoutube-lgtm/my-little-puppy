@@ -675,10 +675,7 @@ test('Real action buttons complete each care route from every permitted room', a
     ['[data-kitchen-water]', 'kitchen', ['WalkToWater', 'DrinkWater', 'LickLips', 'DrinkWalkHome']],
     ['#dress', null, ['DressTurn']],
   ];
-  // Put each action on its XP cooldown so the matrix remains in the Baby stage.
-  const save = app.save();
-  for (const action of ['Feed', 'Sleep', 'Care', 'Play']) save.xpCooldowns[action] = Date.now();
-  assert(w.pawtopiaData.restore(w.PawtopiaSaveTools.create(save, w.localStorage)).ok);
+  const initial = app.save();
   const played = [];
   const frames = [];
   w.requestAnimationFrame = callback => frames.push(callback);
@@ -703,11 +700,14 @@ test('Real action buttons complete each care route from every permitted room', a
   assert.equal(portions(), 0);
   const room = () => app.save().world.room;
   for (const origin of ['living', 'kitchen', 'bedroom', 'bathroom', 'garden']) {
+    assert(w.pawtopiaData.restore(w.PawtopiaSaveTools.create(initial, w.localStorage)).ok);
+    await settle();
     for (const [button, destination, clips] of actions) {
       if (button === '[data-kitchen-water]' && origin !== 'kitchen') continue;
       app.click(`[data-room="${origin}"]`);
       await settle();
       played.length = 0;
+      const xpBefore = app.save().xp;
       app.click(button);
       if (button === '#dress') {
         const outfit = app.save().world.equipped.outfit === 'baby-blue-shirt'
@@ -716,6 +716,7 @@ test('Real action buttons complete each care route from every permitted room', a
         assert.equal(app.save().world.equipped.outfit, outfit);
       }
       const saved = app.save();
+      assert.equal(saved.xp, xpBefore);
       const isFeed = button === '#food';
       const isSleep = button === '#sleep';
       const bowlLevel = () => Number($('#babyFoodBowl').dataset.foodLevel);
@@ -776,6 +777,7 @@ test('Real action buttons complete each care route from every permitted room', a
         await settle();
       }
       assert.deepEqual(played, [...clips, 'Idle']);
+      assert.equal(app.save().xp,xpBefore+10);
       assert.equal(viewer.timeScale, 1);
       assert.equal(room(), isFeed || isSleep ? destination : origin);
       if (isFeed) {

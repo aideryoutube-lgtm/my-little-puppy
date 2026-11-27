@@ -224,7 +224,12 @@
       status.textContent = 'Jerry’s ' + request.stage + ' ' + request.action + ' video could not play.';
       status.hidden = false;
     }
-    if (outcome === 'completed' || (outcome === 'error' && !request.babyRoomFile)) request.complete?.();
+    if (outcome === 'completed') {
+      if (request.complete) request.complete();
+      else window.pawtopiaWorld.completeAction();
+    } else if (outcome === 'error' && !request.babyRoomFile) {
+      request.complete?.(false);
+    }
   }
 
   window.pawtopiaJerryVideo = {
@@ -250,7 +255,7 @@
       if (babySlot?.name === 'drink' || babySlot?.name === 'cookie') {
         const type = babySlot.name === 'drink' ? 'water' : 'cookie';
         complete = () => {
-          const result = window.pawtopiaWorld.commit(type);
+          const result = window.pawtopiaWorld.commit(type, undefined, true);
           document.getElementById('worldMessage').textContent = result.message;
         };
       }

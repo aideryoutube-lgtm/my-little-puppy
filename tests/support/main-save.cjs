@@ -1,1 +1,1 @@
-const fs=require('node:fs');const html=fs.readFileSync('index.html','utf8');module.exports=html.slice(html.indexOf('function persistSave('),html.indexOf('function update(){'));
+const fs=require('node:fs');const html=fs.readFileSync('index.html','utf8');const xpRule=html.match(/^const XP_PER_ACTION=.*$/m)[0]+html.match(/^function addActionXP.*$/m)[0];module.exports=xpRule+html.slice(html.indexOf('function persistSave('),html.indexOf('function update(){'));

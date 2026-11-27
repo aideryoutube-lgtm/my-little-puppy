@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { mount } = require('./support/mini-harness.cjs');
 
 function setup(t, xp, mode = '2d') {
-  const app = mount({ coins: 100, xp });
+  const app = mount({ coins: 100, ...(typeof xp==='number'?{xp}:xp) });
   t.after(app.close);
   const { w, $ } = app;
   w.localStorage.setItem('pawtopia-jerry-display-mode', mode);
@@ -59,7 +59,7 @@ for (const [stage, xp] of [['Baby', 0], ['Puppy', 100], ['Adult', 300]]) {
 }
 
 test('mode and room switches cancel playback; stale media events cannot award anything', t => {
-  const { w, $, click, save, events } = setup(t, 90);
+  const { w, $, click, save, events } = setup(t, {xp:190,growthStage:'Baby',growthRules:2});
   const before = save();
   click('#food');
   const stale = $('#jerryLegacyClip');
@@ -77,12 +77,12 @@ test('mode and room switches cancel playback; stale media events cannot award an
   current.dispatchEvent(new w.Event('ended'));
   current.dispatchEvent(new w.Event('error'));
   assert.equal(save().feedCount, before.feedCount + 1);
-  assert.equal(save().xp, 100);
+  assert.equal(save().xp, 200);
   assert.equal(save().growthStage, 'Puppy');
   click('#ball');
   w.pawtopiaWorld.commit('room', 'garden');
   assert.equal($('#jerryLegacyClip'), null);
-  assert.equal(save().xp, 100);
+  assert.equal(save().xp, 200);
   assert.equal(save().coins, before.coins);
   assert.equal(w.localStorage.getItem('pawtopia-jerry-display-mode'), '2d');
 });
@@ -235,7 +235,9 @@ test('3D models follow the current stage and ignore a previous model’s load ev
 
   adult.dispatchEvent(new w.Event('load'));
   assert.equal(ready(), true);
+  const beforeTouch = w.pawtopiaWorld.snapshot().xp;
   adult.click();
+  assert.equal(w.pawtopiaWorld.snapshot().xp,beforeTouch+10);
   assert.equal($('#jerryActionStatus').textContent, 'No Adult 3D animation is available for touch.');
   for (const room of ['living', 'kitchen', 'bedroom', 'bathroom', 'garden']) {
     w.pawtopiaWorld.commit('room', room);
@@ -324,8 +326,8 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
     assert(original.hidden);
     assert($('#jerryActionStatus').hidden);
     assert.deepEqual(buttons.map(button => button.getAttribute('aria-label')), labels);
-    const before = save();
     for (const button of room === 'bedroom' ? buttons.slice(2) : buttons) {
+      const before = save();
       assert.equal(button.id, 'puppy-' + room + '-' + button.getAttribute('aria-label').toLowerCase());
       slots.add(button.id);
       button.click();
@@ -354,7 +356,8 @@ test('Puppy 2D room controls use distinct video slots and preserve the shared co
         assert(!$('#jerryActionStatus').hidden);
       }
       assert.equal($('#jerryLegacyClip'), null);
-      assert.deepEqual(save(), before);
+      if (clips[button.id]) assert.equal(save().xp,before.xp+10);
+      else assert.deepEqual(save(), before);
     }
     click('[data-jerry-mode="3d"]');
     assert(panel.hidden);
@@ -398,7 +401,7 @@ test('Carrot Snack plays with sound only for Baby 2D in Kitchen', t => {
   clip.dispatchEvent(new w.Event('ended'));
   assert.equal($('#jerryLegacyClip'), null);
   assert(!button.disabled);
-  assert.deepEqual(save(), before);
+  assert.equal(save().xp, before.xp + 10);
   click('[data-jerry-mode="3d"]');
   assert(button.parentElement.hidden);
   assert.equal(w.pawtopiaJerryVideo.play(button.id), false);
@@ -456,16 +459,16 @@ const newBabyClips = [
     { clean: 90, xp: 10, bathCount: label === 'Bath' ? 1 : 0 }
   ]),
   ...['House', 'Run', 'Ball'].map(label => [
-    'garden', label, 'Baby_' + label + '_Garden_4s.mp4', { xp: 0, playCount: 0, fun: 50 }
+    'garden', label, 'Baby_' + label + '_Garden_4s.mp4', { xp: 10, playCount: 0, fun: 50 }
   ]),
   ['kitchen', 'Feed', 'Baby_Feed_Kitchen_4s.mp4', { hunger: 80, feedCount: 1, xp: 10 }],
-  ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 0 }],
-  ['kitchen', 'Cookie', 'Baby_Cookie_Kitchen_4s.mp4', { hunger: 55, xp: 0 }],
+  ['kitchen', 'Drink', 'Baby_Drink_Kitchen_4s_DeepCrop.mp4', { hunger: 50, xp: 10 }],
+  ['kitchen', 'Cookie', 'Baby_Cookie_Kitchen_4s.mp4', { hunger: 55, xp: 10 }],
   ['bedroom', 'Sleep', 'Baby_Sleep_Bedroom_4s.mp4', { energy: 100, xp: 10 }],
-  ['bedroom', 'Play', 'Baby_Play_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }],
-  ['bedroom', 'Dress', 'Baby_Dress_Bedroom_4s.mp4', { xp: 0 }],
-  ['bedroom', 'Jump', 'Baby_Jump_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }],
-  ['bedroom', 'Cuddle', 'Baby_Cuddle_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 15 }]
+  ['bedroom', 'Play', 'Baby_Play_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 10 }],
+  ['bedroom', 'Dress', 'Baby_Dress_Bedroom_4s.mp4', { xp: 10 }],
+  ['bedroom', 'Jump', 'Baby_Jump_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 10 }],
+  ['bedroom', 'Cuddle', 'Baby_Cuddle_Bedroom_4s.mp4', { fun: 85, energy: 75, playCount: 1, xp: 10 }]
 ];
 for (const [room, label, file, expected] of newBabyClips) {
   test('Baby ' + room + ' ' + label + ' plays with sound and applies effects once', t => {
@@ -584,4 +587,56 @@ for (const [stage, xp] of [['baby', 0], ['puppy', 100], ['adult', 300]]) {
     assert(panel.hidden);
     assert.equal($('#food').textContent, '🍖');
   });
+}
+
+const xpRooms = ['living','kitchen','bedroom','bathroom','garden'];
+for (const [stage,xp] of [['Baby',0],['Puppy',100],['Adult',300]]) {
+  for (const mode of ['2d','3d']) {
+    test(stage + ' ' + mode + ' rewards completed care across all five rooms', async t => {
+      for (const room of xpRooms) {
+        const {w,$,click,save} = setup(t, xp, mode);
+        w.fetch = async () => ({ok:true,blob:async()=>new w.Blob()});
+        w.URL.createObjectURL = () => 'blob:xp-test';
+        w.URL.revokeObjectURL = () => {};
+        click('[data-room="'+room+'"]');
+        assert.equal(save().xp,xp);
+        click('#worldSettingsButton');
+        click('#worldClose');
+        assert.equal(save().xp,xp);
+        const panel = [...w.document.querySelectorAll('.scene-actions')].find(nav=>!nav.hidden);
+        const candidates = [...panel.querySelectorAll('button:not(:disabled)')];
+        for (const button of candidates) {
+          const before = save().xp;
+          if (mode==='3d') {
+            // The animation matrix drives the real Baby clips separately.
+            let completion;
+            $('#scene').addEventListener('pawtopia-jerry-action', event=>{
+              const {finishMeal,finishSleep,finishAction} = event.detail;
+              completion = finishMeal||finishSleep||finishAction;
+              if(completion)event.preventDefault();
+            },{once:true});
+            button.click();
+            assert.equal(save().xp,before);
+            if(completion){
+              completion();
+              completion();
+              assert.equal(save().xp,before+10);
+            } else if(!$('#worldOverlay').hidden)click('#worldClose');
+          } else {
+            button.click();
+            const video=$('#jerryLegacyClip');
+            assert.equal(save().xp,before);
+            if (video){
+              video.dispatchEvent(new w.Event('ended'));
+              video.dispatchEvent(new w.Event('ended'));
+              assert.equal(save().xp,before+10);
+            }
+          }
+        }
+        const beforeModeChange=save().xp;
+        click('[data-jerry-mode="'+(mode==='2d'?'3d':'2d')+'"]');
+        assert.equal(save().xp,beforeModeChange);
+      }
+    });
+  }
 }

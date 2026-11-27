@@ -67,6 +67,7 @@
       ? 'No ' + stage + ' 3D animation is available for ' + action + '.'
       : 'The ' + stage + ' 3D model is unavailable.';
     status.hidden = false;
+    if (action === 'touch' && loaded && !viewer.hidden) event.detail.finishAction?.();
   });
   new MutationObserver(records => {
     if (records.some(record => record.oldValue !== scene.dataset.growthStage)) {
