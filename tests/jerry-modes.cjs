@@ -153,17 +153,23 @@ test('only 2D Bathroom shows the five icon controls and routes Puppy clips', asy
     const label = button.getAttribute('aria-label');
     button.click();
     const video = $('#jerryLegacyClip');
-    const expected = label === 'Bath'
-      ? 'assets/videos/puppy/Puppy_Bath_Bathroom_4s.mp4'
+    const updated = label === 'Bath' || label === 'Bubbles';
+    const expected = updated
+      ? 'assets/videos/puppy/Puppy_' + label + '_Bathroom_4s.mp4'
       : 'assets/videos/puppy/Jerry_Puppy_Bathroom_' + label + '.mp4';
     await new Promise(resolve => setImmediate(resolve));
-    assert.equal(downloaded, expected);
-    assert.equal(video.getAttribute('src'), 'blob:bathroom');
+    if (!updated) assert.equal(downloaded, expected);
+    assert.equal(video.getAttribute('src'), updated ? expected : 'blob:bathroom');
+    if (updated) assert.equal(video.muted, false);
+    assert.equal(video.loop, false);
     assert(fs.existsSync(expected));
     assert(buttons.every(button => button.disabled));
     buttons[4].click();
     assert.equal($('#jerryLegacyClip'), video);
+    const xp = w.pawtopiaWorld.snapshot().xp;
     video.dispatchEvent(new w.Event('ended'));
+    video.dispatchEvent(new w.Event('ended'));
+    assert.equal(w.pawtopiaWorld.snapshot().xp, xp + 10);
     assert.equal($('#jerryLegacyClip'), null);
     assert.equal(w.pawtopiaWorld.snapshot().world.room, 'bathroom');
     assert(buttons.every(button => !button.disabled));

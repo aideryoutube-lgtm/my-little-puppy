@@ -13,7 +13,7 @@
   const silent = { Baby: ['sleep', 'bath', 'touch'], Puppy: ['feed', 'house', 'sleep', 'bath', 'touch'] };
   const bathroomActions = [
     ['Bath', '🛁'],
-    ['Bubbles', '🫧', 'Jerry_Puppy_Bathroom_Bubbles.mp4'],
+    ['Bubbles', '🫧', 'Puppy_Bubbles_Bathroom_4s.mp4'],
     ['Brush', '🪮', 'Jerry_Puppy_Bathroom_Brush.mp4'],
     ['Dry', '💨', 'Jerry_Puppy_Bathroom_Dry.mp4'],
     ['Mirror', '🪞', 'Jerry_Puppy_Bathroom_Mirror.mp4']
@@ -250,6 +250,7 @@
         return true;
       }
       const puppyRoomFile = puppy2d ? slot?.file || puppyRoomFiles[room]?.[action] : undefined;
+      const updatedPuppyBathClip = puppy2d && room === 'bathroom' && (action === 'bath' || action === 'bubbles');
       const babyRoomFile = baby2d ? babySlot?.file || babyRoomFiles[room]?.[action] : undefined;
       const file = babyRoomFile || puppyRoomFile || videos[stage]?.[action];
       if (babySlot?.name === 'drink' || babySlot?.name === 'cookie') {
@@ -273,7 +274,7 @@
       renderActions();
       video.id = 'jerryLegacyClip';
       video.playsInline = true;
-      video.muted = !slot && !babyRoomFile;
+      video.muted = !slot && !babyRoomFile && !updatedPuppyBathClip;
       if (slot) video.classList.add('puppy-room-action-clip');
       if (babyRoomFile && room === 'bedroom' && action !== 'sleep') {
         video.classList.add('baby-bedroom-action-clip');
@@ -296,7 +297,7 @@
         video.src = url;
         video.play()?.catch(() => finish(request, 'error'));
       }
-      if ((puppyRoomFile && !slot) || (stage === 'Baby' && action === 'dress')) {
+      if ((puppyRoomFile && !slot && !updatedPuppyBathClip) || (stage === 'Baby' && action === 'dress')) {
         // WebKit can stall on these HTTP streams. Play their original bytes from memory.
         request.download = new AbortController();
         fetch(source, { signal: request.download.signal }).then(response => {
